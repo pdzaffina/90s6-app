@@ -1,6 +1,6 @@
 (() => {
   'use strict';
-  let prompts = [];
+  let prompts = []; let isAdmin = false;
   const $ = id => document.getElementById(id);
   const search = $('promptSearch');
   const category = $('categoryFilter');
@@ -26,7 +26,7 @@
     grid.replaceChildren();
     visible.forEach(p => {
       const card = el('article','prompt-card');
-      card.append(el('div','prompt-category',p.category || 'Other'),el('h3','',p.title || 'Untitled prompt'),el('p','',p.description || ''));
+      card.append(el('div','prompt-category',(p.category || 'Other')+(p.admin_only && isAdmin ? ' · Admin only' : '')),el('h3','',p.title || 'Untitled prompt'),el('p','',p.description || ''));
       card.append(el('div','prompt-preview',p.prompt));
       const tags = el('div','prompt-tags'); (p.tags || []).forEach(t => tags.append(el('span','',t))); card.append(tags);
       const actions = el('div','prompt-actions');
@@ -43,5 +43,5 @@
   $('copyEdited').addEventListener('click',() => copyText($('editorText').value,$('editorStatus')));
   search.addEventListener('input',render); category.addEventListener('change',render);
   $('resultCount').textContent='Loading prompts...';
-  App.onSession(async session=>{if(!session)return;const {data,error}=await App.sb.from('prompt_library_items').select('id,title,category,description,prompt,tags').is('archived_at',null).order('title');if(error){$('resultCount').textContent='Unable to load prompts: '+error.message;return}prompts=data||[];updateCategories();render()});
+  App.onSession(async (session,profile)=>{if(!session)return;isAdmin=!!profile?.is_admin;const {data,error}=await App.sb.from('prompt_library_items').select('id,title,category,description,prompt,tags,admin_only').is('archived_at',null).order('title');if(error){$('resultCount').textContent='Unable to load prompts: '+error.message;return}prompts=(data||[]).filter(p=>isAdmin||!p.admin_only);updateCategories();render()});
 })();

@@ -28,7 +28,39 @@ function flatten(m,keep,open){const rows=[];const walk=(pid,depth,prefix)=>{(m.g
 function fixTree(){const byId=new Map(data.map(x=>[x.id,x]));for(const x of data){if(x.parent===x.id||!byId.has(x.parent))x.parent=''}for(const x of data){const seen=new Set([x.id]);let p=byId.get(x.parent);while(p){if(seen.has(p.id)){x.parent='';break}seen.add(p.id);p=byId.get(p.parent)}}}
 function chips(x){const box=node('div','atts');for(const f of x.attachments||[]){const b=node('button','att','\u{1F4CE} '+f.name);b.type='button';b.title=f.name;b.addEventListener('click',ev=>{ev.stopPropagation();const H=window.WCHooks;H&&H.openAtt?H.openAtt(f):showToast('Sign in to open attachments')});box.append(b)}return box}
 function fillParents(x,preset){const sel=$('parent');sel.replaceChildren(new Option('None (top level)',''));const banned=new Set();if(x){const add=id=>{banned.add(id);data.filter(a=>a.parent===id).forEach(a=>add(a.id))};add(x.id)}for(const r of flatten(kidsOf())){if(banned.has(r.x.id))continue;sel.append(new Option('\u00a0\u00a0'.repeat(r.depth)+r.num+' '+r.x.title.slice(0,60),r.x.id))}sel.value=(x?x.parent:preset)||'';if(sel.selectedIndex<0)sel.selectedIndex=0}
-function setView(v){view=v;document.body.classList.toggle('view-wbs',v==='wbs');$('viewBoard').classList.toggle('primary',v==='board');$('viewWbs').classList.toggle('primary',v==='wbs');render()}
+function setView(v){$('exportWbsBtn').hidden=v!=='wbs';view=v;document.body.classList.toggle('view-wbs',v==='wbs');$('viewBoard').classList.toggle('primary',v==='board');$('viewWbs').classList.toggle('primary',v==='wbs');render()}
+function exportWbsExcel(){
+ if(view!=='wbs')return;
+ if(!window.XLSX){showToast('Excel export is unavailable. Reload and try again.');return}
+ const query=$('searchInput').value.trim().toLowerCase();
+ let keep=null;
+ if(query){
+  const byId=new Map(data.map(x=>[x.id,x]));
+  keep=new Set();
+  for(const x of data){
+   if(![x.title,x.description,x.owner].join(' ').toLowerCase().includes(query))continue;
+   let p=x;
+   while(p&&!keep.has(p.id)){keep.add(p.id);p=byId.get(p.parent)}
+  }
+ }
+ const rows=flatten(kidsOf(),keep);
+ const records=rows.map(({x,num,depth})=>({
+  'WBS':num,'Work Item':x.title,'Description':x.description,
+  'Owner':x.owner,'Column':x.when,'Swimlane':x.kind,
+  'Size':x.effort,'Due Date':x.due,'Parent WBS':num.includes('.')?num.slice(0,num.lastIndexOf('.')):'',
+  'Level':depth+1,'Attachments':(x.attachments||[]).map(f=>f.name).join('; ')
+ }));
+ const headers=['WBS','Work Item','Description','Owner','Column','Swimlane','Size','Due Date','Parent WBS','Level','Attachments'];
+ const ws=window.XLSX.utils.json_to_sheet(records,{header:headers});
+ if(!records.length)window.XLSX.utils.sheet_add_aoa(ws,[headers],{origin:'A1'});
+ ws['!cols']=[{wch:15},{wch:48},{wch:65},{wch:24},{wch:22},{wch:22},{wch:12},{wch:15},{wch:16},{wch:9},{wch:45}];
+ ws['!autofilter']={ref:'A1:K'+(records.length+1)};
+ const wb=window.XLSX.utils.book_new();
+ window.XLSX.utils.book_append_sheet(wb,ws,'WBS');
+ const boardName=(window.WCBoardName||'work-board').replace(/[^a-z0-9-_ ]/gi,'').trim().replace(/\\s+/g,'-').slice(0,50)||'work-board';
+ window.XLSX.writeFile(wb,boardName+'-WBS-'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+$('exportWbsBtn').addEventListener('click',exportWbsExcel);
 function renderWbs(){const query=$('searchInput').value.trim().toLowerCase();const filtering=!!query;const byId=new Map(data.map(x=>[x.id,x]));const hit=x=>(!query||[x.title,x.description,x.owner].join(' ').toLowerCase().includes(query));let keep=null;if(filtering){keep=new Set();for(const x of data)if(hit(x)){let p=x;while(p&&!keep.has(p.id)){keep.add(p.id);p=byId.get(p.parent)}}}
 const rows=flatten(kidsOf(),keep,x=>filtering||!collapsed.has(x.id));const wrap=$('wbs');wrap.replaceChildren();
 const top=node('div','wbsTop');const left=node('div','wbsAct wbs-edit');const addTop=node('button','primary','+ Add top-level task');addTop.type='button';addTop.addEventListener('click',()=>openEditor());left.append(addTop);

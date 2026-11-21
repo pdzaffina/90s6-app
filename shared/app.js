@@ -12,7 +12,7 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
+  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
 
   // ---------- Sign in gate ----------
   const gate = el('div', { id: 'appGate' });
@@ -45,7 +45,7 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
+    <nav><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
     <span class="who" id="apWho"></span>
     <button type="button" id="apOut">Sign out</button>`;
   document.body.prepend(nav);
@@ -59,7 +59,7 @@
     if (state !== 'in') return;
     $('apAdminLink').hidden = !profile.is_admin;
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
-    [['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
+    [['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     $('apWho').textContent = profile.full_name || profile.email || '';
   }
 
@@ -84,7 +84,7 @@
       return;
     }
     profile = data; const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled); state = 'in';
-    const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/work-board/')?'work_board':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
+    const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
     try {
       if (sessionStorage.getItem('ap-sess') !== s.user.id) {

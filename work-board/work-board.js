@@ -35,6 +35,12 @@
     .wcRow>*{flex:1;min-width:0}
     .wcRow>select{flex:0 0 auto}
     #wcAuth .wcRow{margin-bottom:10px}
+    #wcManage{max-height:90vh;overflow-y:auto}
+    #wcManage .field input,#wcManage .field select{font:inherit;min-height:42px;position:relative;z-index:1}
+    #wcManage .wcRow{flex-wrap:wrap}
+    #wcManage .wcRow input{flex:2 1 190px}
+    #wcManage .wcRow select{flex:1 1 125px}
+    #wcManage .wcRow button{flex:0 0 auto}
     #wcMsg{margin:14px 0 0;min-height:18px}#wcMsg.err{color:#a43131}
     #boardSelect{padding:9px 10px;border:1px solid #c9d1d8;border-radius:9px;background:#fff;font-weight:600;max-width:220px}
     #boardBadge{font-size:12px;font-weight:700;color:#52606b}
@@ -216,6 +222,22 @@
     if (!box.children.length) box.append(el('span', { className: 'wcMuted', textContent: 'Not shared with anyone yet.' }));
   }
 
+  async function loadShareUsers() {
+    // Only admins may enumerate the user directory. Other board owners can share by email.
+    const { data: mine } = await sb.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    const field = $('wcExistingField');
+    field.hidden = !mine?.is_admin;
+    if (!mine?.is_admin) return;
+    const { data, error } = await sb.from('profiles').select('id,email,full_name,disabled').eq('disabled', false).order('email');
+    if (error) { field.hidden = true; return; }
+    const select = $('wcExisting');
+    select.replaceChildren(el('option', { value: '', textContent: 'Choose a user...' }));
+    (data || []).filter(p => p.id !== user.id && p.email).forEach(p =>
+      select.append(el('option', { value: p.email, textContent: p.full_name ? p.full_name + ' (' + p.email + ')' : p.email })));
+  }
+  $('wcExisting').addEventListener('change', e => {
+    if (e.target.value) $('wcInvEmail').value = e.target.value;
+  });
   manageBtn.addEventListener('click', () => {
     $('wcName').value = current.name; $('wcInvEmail').value = '';
     dlg.showModal(); renderPeople();

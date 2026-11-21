@@ -19,7 +19,7 @@
   const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); Object.assign(n, props); n.append(...kids); return n; };
   const toast = m => board.toast(m);
 
-  let user = null, boards = [], current = null, lastSeen = null;
+  let user = null, boards = [], current = null, lastSeen = null, canManage = false;
   let ready = false, timer = null, pending = null, chain = Promise.resolve();
   const canEdit = () => !!current && current.role !== 'viewer';
 
@@ -75,7 +75,7 @@
     $('wcLead').textContent = ({
       error: 'Could not load your boards. Reload to try again.',
       loading: 'Loading your boards...',
-      none: 'No boards yet. Ask the owner to share one with your email, or create your own.'
+      none: canManage ? 'No boards yet. Create a board or ask someone to share one with you.' : 'No boards yet. Ask an admin or superuser to share one with your email.'
     })[mode] || '';
     msg('');
   }
@@ -99,7 +99,8 @@
       return o;
     }));
     badge.textContent = !current || current.role === 'owner' ? '' : current.role === 'viewer' ? 'View only' : 'Can edit';
-    manageBtn.hidden = !(current && current.role === 'owner');
+    newBoardBtn.hidden = !canManage;
+    manageBtn.hidden = !(canManage && current && current.role === 'owner');
     layoutBtn.hidden = manageBtn.hidden;
   }
 
@@ -164,7 +165,7 @@
   // ---------- Board actions ----------
   async function createBoard() {
     const name = (prompt('Board name (for example, the client name)') || '').trim();
-    if (!name) return;
+    if (!name || !canManage) return;
     await flush();
     const { data, error } = await sb.from('boards')
       .insert({ name: name.slice(0, 80), owner_id: user.id, data: [] })
@@ -224,11 +225,11 @@
   }
 
   async function loadShareUsers() {
-    // Only admins may enumerate the user directory. Other board owners can share by email.
-    const { data: mine } = await sb.from('profiles').select('is_admin').eq('id', user.id).maybeSingle();
+    // Only admins and superusers may enumerate the user directory.
+    const { data: mine } = await sb.from('profiles').select('is_admin,is_superuser').eq('id', user.id).maybeSingle();
     const field = $('wcExistingField');
-    field.hidden = !mine?.is_admin;
-    if (!mine?.is_admin) return;
+    field.hidden = !(mine?.is_admin || mine?.is_superuser);
+    if (!(mine?.is_admin || mine?.is_superuser)) return;
     const { data, error } = await sb.from('profiles').select('id,email,full_name,disabled').eq('disabled', false).order('email');
     if (error) { field.hidden = true; return; }
     const select = $('wcExisting');
@@ -445,13 +446,15 @@
   };
 
   // ---------- Session handling ----------
-  async function handle(session) {
+  async function handle(session, profile) {
     if (!session) {
-      user = null; ready = false; current = null; boards = [];
+      user = null; ready = false; current = null; boards = []; canManage = false;
       showBar(false); showGate(null); return;
     }
     if (user && user.id === session.user.id) return; // token refresh, nothing to reload
     user = session.user;
+    canManage = !!(profile && (profile.is_admin || profile.is_superuser) && !profile.disabled);
+    $('wcCreateFirst').hidden = !canManage;
     showGate('loading');
     try { await loadBoards(); } catch (e) { toast('Could not load boards: ' + e.message); showGate('error'); return; }
     showBar(true);
@@ -462,5 +465,5 @@
   }
 
   // The shared App handles sign in and calls back with the session (or null)
-  App.onSession(session => handle(session));
+  App.onSession((session, profile) => handle(session, profile));
 })();

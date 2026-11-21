@@ -1,0 +1,11 @@
+html.training-await-auth body > :not(.training-app-bar):not(.training-auth-blocker):not(#appNav):not(#appGate){visibility:hidden}
+html.training-auth-ready body > :not(.training-app-bar):not(.training-auth-blocker):not(#appNav):not(#appGate){visibility:visible}
+.training-app-bar{position:relative;z-index:30;display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:11px max(24px,calc((100vw - 1180px)/2));background:#0a192f;border-bottom:1px solid #29415c;color:#f5f7fa;font:13px/1.5 Inter,system-ui,sans-serif}
+.training-app-bar a{color:#d4e5f4;text-decoration:none;font-weight:650}.training-app-brand{font-weight:800!important;letter-spacing:.06em;color:white!important}
+.training-app-bar nav{display:flex;gap:18px;flex-wrap:wrap}.training-app-bar a:hover{text-decoration:underline;color:white}
+.training-auth-blocker{position:fixed;inset:0;z-index:2147483000;background:#f5f7fa;color:#0a192f;display:flex;align-items:center;justify-content:center;padding:24px;font:15px/1.55 system-ui,sans-serif}
+.training-auth-box{background:white;border:1px solid #dce3eb;border-radius:10px;padding:30px;max-width:420px;width:100%;box-shadow:0 12px 45px #0a192f22}
+.training-auth-box strong{font-size:20px}.training-auth-box a{color:#006bb6}
+.training-auth-blocker[hidden],.training-app-bar[hidden]{display:none!important}
+body #appNav{position:relative;z-index:70;font:13px Inter,system-ui,sans-serif}body #appGate{z-index:2147483100}
+@media(max-width:700px){.training-app-bar{padding:12px 16px}.training-app-bar nav{gap:12px}}

@@ -58,7 +58,7 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/work-board/">Work Board</a><a href="/admin/" id="apAdminLink" hidden>Admin</a></nav>
+    <nav><a href="/work-board/">Work Board</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
     <span class="who" id="apWho"></span>
     <button type="button" id="apOut">Sign out</button>`;
   document.body.prepend(nav);

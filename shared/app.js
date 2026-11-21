@@ -87,7 +87,7 @@
     session = s;
     $('apForm').hidden = true; gate.hidden = false; msg('Loading your account...');
     const { data, error } = await sb.from('profiles')
-      .select('id,email,full_name,is_admin,disabled').eq('id', s.user.id).maybeSingle();
+      .select('id,email,full_name,is_admin,is_superuser,disabled').eq('id', s.user.id).maybeSingle();
     if (error || !data || data.disabled) {
       notice = data && data.disabled ? 'This account is disabled. Contact your administrator.' : 'Could not load your account. Try again.';
       session = null;

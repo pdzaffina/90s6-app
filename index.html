@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js; connect-src https://YOUR-PROJECT-REF.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<title>90S6 | Workspace</title>
+<link rel="stylesheet" href="/shared/app.css">
+</head>
+<body class="ap-body">
+<main class="ap-main ap-home">
+  <div class="ap-eyebrow">90S6 / WORKSPACE</div>
+  <section class="ap-intro">
+    <div>
+      <p class="ap-kicker">90S6 CONSULTING</p>
+      <h1>Good work starts<br>with <span>clarity.</span></h1>
+      <p class="ap-lead">A focused workspace for the work that moves your business forward.</p>
+    </div>
+    <div class="ap-index" aria-hidden="true"><span>90</span><span>S6</span></div>
+  </section>
+  <div class="ap-section-head"><span>YOUR WORKSPACE</span><span>01 / APPLICATIONS</span></div>
+  <div class="ap-cards">
+    <a class="ap-card ap-card-feature" href="/work-board/">
+      <span class="ap-card-number">01</span>
+      <div><h2>Work Board <span aria-hidden="true">↗</span></h2><p>Bring priorities, ownership, and next actions into focus. Now, Next, Later, with nested tasks and a work breakdown view.</p></div>
+    </a>
+    <a class="ap-card" id="adminCard" href="/admin/" hidden>
+      <span class="ap-card-number">02</span>
+      <div><h2>Administration <span aria-hidden="true">↗</span></h2><p>Manage access, invitations, accounts, and the system audit trail.</p></div>
+    </a>
+  </div>
+  <section class="ap-account">
+    <div><p class="ap-kicker">ACCOUNT SETTINGS</p><h2>Keep your access secure.</h2><p>Update your password for the 90S6 workspace.</p></div>
+    <form id="pwForm" class="ap-password-form">
+      <label class="ap-sr-only" for="newPass">New password</label>
+      <input class="ap-input" id="newPass" type="password" autocomplete="new-password" placeholder="New password, 12+ characters">
+      <button class="ap-btn primary" type="submit">Update password <span aria-hidden="true">↗</span></button>
+      <p id="pwMsg" class="ap-msg" aria-live="polite"></p>
+    </form>
+  </section>
+  <footer class="ap-footer"><span>90S6 CONSULTING</span><span>STRATEGY / SYSTEMS / EXECUTION</span></footer>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
+<script src="/shared/config.js"></script>
+<script src="/shared/app.js"></script>
+<script src="/home.js"></script>
+</body>
+</html>

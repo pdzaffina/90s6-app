@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js; connect-src https://ohsrtfnlnlbipylyqpnh.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<title>Admin | 90S6 App</title>
+<link rel="stylesheet" href="/shared/app.css">
+</head>
+<body class="ap-body">
+<main class="ap-main">
+<h1>Admin</h1>
+<p id="denied" class="ap-msg err" hidden>This section is for administrators only.</p>
+<div id="adminBody" hidden>
+<section class="ap-panel" style="margin-top:0"><h2>Invite a user</h2>
+<form id="inviteForm" class="ap-row"><input class="ap-input" id="inviteEmail" type="email" placeholder="name@company.com" autocomplete="off"><button class="ap-btn primary" type="submit">Send invitation</button></form></section>
+<section class="ap-panel"><h2>Users</h2><p id="adminMsg" class="ap-msg"></p>
+<div class="ap-wrap"><table class="ap-table"><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Boards</th><th>Last seen</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></section>
+<section class="ap-panel"><h2>Audit log</h2>
+<p class="ap-msg">Shows who did what and when. Task titles and file names are board content, so they are not shown here. Board owners see them in each board's Activity view.</p>
+<form id="auditForm" class="ap-row">
+<select class="ap-input" id="auditPrefix" style="min-width:0"><option value="">All events</option><option value="auth.">Sign ins</option><option value="board.">Boards</option><option value="task.">Tasks</option><option value="file.">Files</option><option value="member.">Members</option><option value="invite.">Invites</option><option value="admin.">Admin actions</option></select>
+<input class="ap-input" id="auditActor" type="text" placeholder="Filter by user email" autocomplete="off">
+<button class="ap-btn primary" type="submit">Apply</button><button class="ap-btn" type="button" id="auditCsv">Export CSV</button></form>
+<p id="auditMsg" class="ap-msg"></p>
+<div class="ap-wrap"><table class="ap-table"><thead><tr><th>Time</th><th>Who</th><th>What</th></tr></thead><tbody id="auditRows"></tbody></table></div>
+<p><button class="ap-btn" type="button" id="auditMore" hidden>Load more</button></p></section>
+</div>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/shared/config.js"></script>
+<script src="/shared/app.js"></script>
+<script src="/shared/audit.js"></script>
+<script src="/admin/admin.js"></script>
+</body>
+</html>

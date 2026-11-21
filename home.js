@@ -3,6 +3,7 @@
   const $ = id => document.getElementById(id);
   App.onSession((session, profile) => {
     if (!session) return;
+    $('hello').textContent = profile.full_name ? ', ' + profile.full_name : '';
     $('adminCard').hidden = !profile.is_admin;
   });
   $('pwForm').addEventListener('submit', async e => {

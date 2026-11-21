@@ -195,10 +195,39 @@
         <div class="wcRow"><input id="wcInvEmail" type="email" placeholder="client@example.com">
           <select id="wcInvRole"><option value="editor">Can edit</option><option value="viewer">View only</option></select>
           <button type="button" class="primary" id="wcShare" style="flex:0 0 auto">Share</button></div></div>
+      <div class="field"><label>Public view-only link</label><p class="wcMuted">Anyone with this link can view this board without signing in. Attachments are excluded.</p>
+        <div class="wcRow"><input id="wcPublicUrl" readonly placeholder="Public sharing is off"><button type="button" id="wcPublicCopy">Copy link</button></div>
+        <div class="wcRow"><button type="button" id="wcPublicEnable">Enable public link</button><button type="button" id="wcPublicDisable">Disable link</button></div></div>
       <div class="actions"><button type="button" class="danger" id="wcDelete">Delete board</button><button type="button" id="wcActivityBtn">Activity</button><button type="button" id="wcClose">Close</button></div>
     </div>`;
   document.body.append(dlg);
 
+  async function refreshPublicLink(){
+    if(!current)return;
+    const {data,error}=await sb.from('board_public_links').select('token').eq('board_id',current.id).maybeSingle();
+    if(error){toast('Could not check public sharing: '+error.message);return}
+    $('wcPublicUrl').value=data?location.origin+'/public-board/?token='+data.token:'';
+    $('wcPublicEnable').hidden=!!data;
+    $('wcPublicDisable').hidden=!data;
+    $('wcPublicCopy').disabled=!data;
+  }
+  $('wcPublicEnable').addEventListener('click',async()=>{
+    if(!canManage||!current||current.role!=='owner')return;
+    const {error}=await sb.from('board_public_links').insert({board_id:current.id});
+    if(error)return toast('Could not enable public sharing: '+error.message);
+    await refreshPublicLink();toast('Public view-only link enabled');
+  });
+  $('wcPublicDisable').addEventListener('click',async()=>{
+    if(!canManage||!current||current.role!=='owner')return;
+    const {error}=await sb.from('board_public_links').delete().eq('board_id',current.id);
+    if(error)return toast('Could not disable public sharing: '+error.message);
+    await refreshPublicLink();toast('Public link disabled');
+  });
+  $('wcPublicCopy').addEventListener('click',async()=>{
+    const url=$('wcPublicUrl').value;if(!url)return;
+    try{await navigator.clipboard.writeText(url);toast('Public link copied')}
+    catch(e){$('wcPublicUrl').select();toast('Select and copy the link')}
+  });
   function personRow(label, note, onRemove) {
     const rm = el('button', { type: 'button', className: 'ghost', textContent: 'Remove' });
     rm.addEventListener('click', onRemove);
@@ -242,7 +271,7 @@
   });
   manageBtn.addEventListener('click', () => {
     $('wcName').value = current.name; $('wcInvEmail').value = '';
-    dlg.showModal(); renderPeople(); loadShareUsers().catch(() => { $('wcExistingField').hidden = true; });
+    dlg.showModal(); renderPeople(); refreshPublicLink(); loadShareUsers().catch(() => { $('wcExistingField').hidden = true; });
   });
   $('wcClose').addEventListener('click', () => dlg.close());
 

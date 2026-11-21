@@ -1,14 +1,13 @@
 (() => {
   'use strict';
-  const prompts = Array.isArray(window.COPILOT_PROMPTS) ? window.COPILOT_PROMPTS.filter(p => p && typeof p.id === 'string' && typeof p.prompt === 'string') : [];
+  let prompts = [];
   const $ = id => document.getElementById(id);
   const search = $('promptSearch');
   const category = $('categoryFilter');
   const grid = $('promptGrid');
   const dialog = $('editorDialog');
   let active = null;
-  const categories = [...new Set(prompts.map(p => p.category || 'Other'))].sort();
-  categories.forEach(name => { const option = document.createElement('option'); option.value = name; option.textContent = name; category.append(option); });
+  function updateCategories(){category.replaceChildren();const all=document.createElement('option');all.value='all';all.textContent='All categories';category.append(all);[...new Set(prompts.map(p=>p.category||'Other'))].sort().forEach(name=>{const option=document.createElement('option');option.value=name;option.textContent=name;category.append(option)})}
   function el(tag, className, text) { const node = document.createElement(tag); if (className) node.className = className; if (text !== undefined) node.textContent = text; return node; }
   async function copyText(value, status) {
     try {
@@ -43,5 +42,6 @@
   $('resetEditor').addEventListener('click',() => { if(active) $('editorText').value = active.prompt; $('editorStatus').textContent = 'Restored original prompt.'; });
   $('copyEdited').addEventListener('click',() => copyText($('editorText').value,$('editorStatus')));
   search.addEventListener('input',render); category.addEventListener('change',render);
-  render();
+  $('resultCount').textContent='Loading prompts...';
+  App.onSession(async session=>{if(!session)return;const {data,error}=await App.sb.from('prompt_library_items').select('id,title,category,description,prompt,tags').is('archived_at',null).order('title');if(error){$('resultCount').textContent='Unable to load prompts: '+error.message;return}prompts=data||[];updateCategories();render()});
 })();

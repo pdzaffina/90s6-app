@@ -108,16 +108,37 @@
   // Defer out of the callback: awaiting supabase calls inside it can deadlock
   sb.auth.onAuthStateChange((_event, s) => setTimeout(() => handle(s), 0));
 
+  let signingOut = false;
   async function signOut() {
-    for (const f of beforeOut) { try { await f(); } catch (e) {} }
-    await sb.auth.signOut();
-    try { sessionStorage.removeItem('ap-sess'); } catch (e) {}
+    if (signingOut) return;
+    signingOut = true;
+    const out = $('apOut');
+    out.disabled = true;
+    out.textContent = 'Signing out...';
+    // Saving the current board should not indefinitely block account sign-out.
+    await Promise.race([
+      Promise.allSettled(beforeOut.map(f => Promise.resolve().then(f))),
+      new Promise(resolve => setTimeout(resolve, 2500))
+    ]);
     try {
-      Object.keys(localStorage)
-        .filter(k => k === 'work-chunks-board-v1' || k.startsWith('wc-'))
-        .forEach(k => localStorage.removeItem(k));
-    } catch (e) {}
-    location.href = '/';
+      // Local scope avoids waiting for a network sign-out request.
+      const { error } = await sb.auth.signOut({ scope: 'local' });
+      if (error) throw error;
+      session = null; profile = null; state = 'out';
+      gate.hidden = false; $('apForm').hidden = false; renderNav(); emit();
+      try { sessionStorage.removeItem('ap-sess'); } catch (e) {}
+      try {
+        Object.keys(localStorage)
+          .filter(k => k === 'work-chunks-board-v1' || k.startsWith('wc-'))
+          .forEach(k => localStorage.removeItem(k));
+      } catch (e) {}
+      location.replace('/');
+    } catch (e) {
+      out.disabled = false;
+      out.textContent = 'Sign out';
+      signingOut = false;
+      alert('Could not sign out: ' + (e.message || e));
+    }
   }
 
   window.App = {

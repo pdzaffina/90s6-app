@@ -27,6 +27,7 @@
 
   function render(users) {
     const body = $('userRows'); body.replaceChildren();
+    window.adminUsers = users; window.dispatchEvent(new CustomEvent('admin-users-loaded',{detail:users}));
     users.forEach(u => {
       const isMe = u.id === me.id;
       const status = u.disabled ? el('span', { className: 'ap-tag off', textContent: 'Disabled' })
@@ -43,7 +44,9 @@
           btn('Delete', 'danger', () => act('delete_user', { id: u.id }, 'Delete ' + u.email + '? This cannot be undone.'))
         );
       }
+      const pick=el('input',{type:'checkbox',className:'feature-user-check',value:u.id,disabled:u.is_admin});pick.addEventListener('change',()=>window.dispatchEvent(new Event('feature-selection-changed')));
       body.append(el('tr', {},
+        el('td', {},pick),
         el('td', { textContent: u.email || '' }),
         el('td', { textContent: u.full_name || '' }),
         el('td', {}, el('span', { className: 'ap-tag' + (u.is_admin ? '' : ' dim'), textContent: u.is_admin ? 'Admin' : u.is_superuser ? 'Superuser' : 'User' })),

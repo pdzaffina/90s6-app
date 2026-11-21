@@ -12,7 +12,7 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = '';
+  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['work_board','training','prompt_library','content_studio','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
 
   // ---------- Sign in gate ----------
   const gate = el('div', { id: 'appGate' });
@@ -58,6 +58,7 @@
     nav.hidden = state !== 'in';
     if (state !== 'in') return;
     $('apAdminLink').hidden = !profile.is_admin;
+    [['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     $('apWho').textContent = profile.full_name || profile.email || '';
   }
 
@@ -81,7 +82,8 @@
       await sb.auth.signOut();
       return;
     }
-    profile = data; state = 'in';
+    profile = data; const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled); state = 'in';
+    const path=location.pathname; const needed=path.startsWith('/work-board/')?'work_board':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
     try {
       if (sessionStorage.getItem('ap-sess') !== s.user.id) {
@@ -130,6 +132,7 @@
 
   window.App = {
     sb,
+    hasFeature,
     signOut,
     onBeforeSignOut: cb => beforeOut.push(cb),
     onSession(cb) {

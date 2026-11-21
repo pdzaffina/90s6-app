@@ -12,7 +12,7 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['work_board','training','prompt_library','content_studio','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
+  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
 
   // ---------- Sign in gate ----------
   const gate = el('div', { id: 'appGate' });

@@ -45,7 +45,7 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/work-board/">Work Board</a><a href="/training/">Content &amp; Training</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
+    <nav><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
     <span class="who" id="apWho"></span>
     <button type="button" id="apOut">Sign out</button>`;
   document.body.prepend(nav);
@@ -74,7 +74,7 @@
     session = s;
     $('apForm').hidden = true; gate.hidden = false; msg('Loading your account...');
     const { data, error } = await sb.from('profiles')
-      .select('id,email,full_name,is_admin,is_superuser,disabled,tour_completed_at').eq('id', s.user.id).maybeSingle();
+      .select('id,email,full_name,is_admin,is_superuser,is_content_creator,disabled,tour_completed_at').eq('id', s.user.id).maybeSingle();
     if (error || !data || data.disabled) {
       notice = data && data.disabled ? 'This account is disabled. Contact your administrator.' : 'Could not load your account. Try again.';
       session = null;

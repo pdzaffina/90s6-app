@@ -56,7 +56,7 @@
 
   async function load() {
     say('Loading...');
-    try { const { users } = await call('list'); render(users); say(users.length + ' users'); }
+    try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));users.forEach(u=>u.is_content_creator=!!roleMap.get(u.id));render(users); say(users.length + ' users'); }
     catch (e) { say(e.message, true); }
   }
 

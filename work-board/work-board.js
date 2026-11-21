@@ -240,7 +240,7 @@
   });
   manageBtn.addEventListener('click', () => {
     $('wcName').value = current.name; $('wcInvEmail').value = '';
-    dlg.showModal(); renderPeople();
+    dlg.showModal(); renderPeople(); loadShareUsers().catch(() => { $('wcExistingField').hidden = true; });
   });
   $('wcClose').addEventListener('click', () => dlg.close());
 
@@ -258,7 +258,7 @@
     const { error } = await sb.from('board_invites')
       .upsert({ board_id: current.id, email, role: $('wcInvRole').value }, { onConflict: 'board_id,email' });
     if (error) return toast(error.message);
-    $('wcInvEmail').value = ''; renderPeople();
+    $('wcInvEmail').value = ''; $('wcExisting').value = ''; renderPeople();
     toast('Shared. Ask them to sign in with that email.');
   });
 

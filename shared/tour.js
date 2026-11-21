@@ -23,7 +23,7 @@
   const r=highlight.getBoundingClientRect(),w=box.offsetWidth,h=box.offsetHeight;
   const left=Math.max(12,Math.min(window.innerWidth-w-12,r.left));
   const below=r.bottom+12;
-  const top=below+h<=window.innerHeight-12?below:Math.max(12,r.top-h-12);
+  const top=idx===steps.length-1 && r.top>=h+18 ? r.top-h-12 : (below+h<=window.innerHeight-12?below:Math.max(12,r.top-h-12));
   box.style.left=left+'px';box.style.top=top+'px';
  }
  async function finish(){

@@ -23,6 +23,7 @@ $('pwForm').addEventListener('submit', async e => {
  const { error } = await App.sb.auth.updateUser({ password: pw });
  $('pwMsg').textContent = error ? error.message : 'Password updated.';
  $('pwMsg').className = 'ap-msg' + (error ? ' err' : '');
- if (!error) $('newPass').value = '';
+ if (!error) { $('newPass').value = ''; if (window.AppTour) window.AppTour.finish(); }
 });
+$('replayTour').addEventListener('click', () => { if(window.AppTour) window.AppTour.restart(); });
 })();

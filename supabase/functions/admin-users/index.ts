@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
   switch (b.action) {
     case 'list': {
       const [p, boards, members] = await Promise.all([
-        db.from('profiles').select('id,email,full_name,is_admin,disabled,created_at,last_seen_at').order('email'),
+        db.from('profiles').select('id,email,full_name,is_admin,is_superuser,disabled,created_at,last_seen_at').order('email'),
         db.from('boards').select('owner_id'),
         db.from('board_members').select('user_id'),
       ]);
@@ -68,6 +68,14 @@ Deno.serve(async (req) => {
       const { error } = await db.from('profiles').update({ is_admin: b.is_admin === true }).eq('id', id);
       if (error) return fail(error);
       await log('admin.set_admin', await emailOf(id), { is_admin: b.is_admin === true });
+      return json({ ok: true });
+    }
+    case 'set_superuser': {
+      const bad = needOther(); if (bad) return bad;
+      const is_superuser = b.is_superuser === true;
+      const { error } = await db.from('profiles').update({ is_superuser }).eq('id', id);
+      if (error) return fail(error);
+      await log('admin.set_superuser', await emailOf(id), { is_superuser });
       return json({ ok: true });
     }
     case 'set_disabled': {

@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js; connect-src https://ohsrtfnlnlbipylyqpnh.supabase.co; style-src 'self' 'unsafe-inline'; img-src 'self' data:; base-uri 'none'; form-action 'self'">
+<title>90S6 | My Profile</title><link rel="stylesheet" href="/shared/app.css"></head>
+<body class="ap-body"><main class="ap-main">
+<div class="ap-eyebrow">90S6 / MY PROFILE</div><h1 style="margin:30px 0">My Profile</h1>
+<section class="ap-panel" style="max-width:650px"><h2>Account details</h2>
+<form id="profileForm"><label for="profileEmail">Email address</label><input id="profileEmail" class="ap-input" type="email" readonly style="display:block;width:100%;margin:6px 0 18px">
+<label for="profileName">Display name</label><input id="profileName" class="ap-input" maxlength="100" autocomplete="name" style="display:block;width:100%;margin:6px 0 14px">
+<button class="ap-btn primary" type="submit">Save profile</button><p id="profileMsg" class="ap-msg" role="status"></p></form></section>
+<section class="ap-panel" style="max-width:650px"><h2>Change password</h2>
+<form id="pwForm"><label for="newPass">New password</label><input class="ap-input" id="newPass" type="password" autocomplete="new-password" minlength="12" required placeholder="At least 12 characters" style="display:block;width:100%;margin:6px 0 14px">
+<button class="ap-btn primary" type="submit">Update password</button><p id="pwMsg" class="ap-msg" role="status"></p></form></section>
+<p style="margin-top:25px"><a href="/">Back to workspace</a></p>
+</main><script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script src="/shared/config.js"></script><script src="/shared/app.js"></script><script src="/profile/profile.js"></script></body></html>

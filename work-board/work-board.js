@@ -189,6 +189,7 @@
       <div class="field"><label for="wcName">Board name</label>
         <div class="wcRow"><input id="wcName" maxlength="80"><button type="button" id="wcRename" style="flex:0 0 auto">Rename</button></div></div>
       <div class="field"><label>People with access</label><div id="wcPeople" class="wcList"></div></div>
+      <div class="field" id="wcExistingField" hidden><label for="wcExisting">Select an existing user</label><select id="wcExisting"><option value="">Choose a user...</option></select></div>
       <div class="field"><label for="wcInvEmail">Share with email</label>
         <div class="wcRow"><input id="wcInvEmail" type="email" placeholder="client@example.com">
           <select id="wcInvRole"><option value="editor">Can edit</option><option value="viewer">View only</option></select>

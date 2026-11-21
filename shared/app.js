@@ -24,7 +24,6 @@
         <label for="apEmail">Email</label><input id="apEmail" type="email" autocomplete="email">
         <label for="apPass">Password</label><input id="apPass" type="password" autocomplete="current-password">
         <button class="primary" type="submit">Sign in</button>
-        <button class="link" type="button" id="apLink">Email me a sign in link instead</button>
       </form>
       <p id="apMsg" role="status"></p>
     </div>`;
@@ -40,18 +39,6 @@
     busy(true); msg('Signing in...');
     const { error } = await sb.auth.signInWithPassword({ email, password });
     busy(false); msg(error ? error.message : '', !!error);
-  });
-
-  $('apLink').addEventListener('click', async () => {
-    const email = $('apEmail').value.trim();
-    if (!email) return msg('Enter your email.', true);
-    busy(true); msg('Sending link...');
-    // shouldCreateUser:false means only people an admin invited can get in
-    const { error } = await sb.auth.signInWithOtp({
-      email, options: { shouldCreateUser: false, emailRedirectTo: location.origin + location.pathname }
-    });
-    busy(false);
-    msg(error ? error.message : 'If that email has an account, a sign in link is on its way.', !!error);
   });
 
   // ---------- Nav bar ----------

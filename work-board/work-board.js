@@ -101,7 +101,7 @@
     badge.textContent = !current || current.role === 'owner' ? '' : current.role === 'viewer' ? 'View only' : 'Can edit';
     newBoardBtn.hidden = !canManage;
     manageBtn.hidden = !(canManage && current && current.role === 'owner');
-    layoutBtn.hidden = manageBtn.hidden;
+    layoutBtn.hidden = !(canManage && current && current.role !== 'viewer');
   }
 
   // ---------- Data ----------
@@ -311,6 +311,7 @@
   }
 
   layoutBtn.addEventListener('click', () => {
+    if (!canManage || !current || current.role === 'viewer') return;
     const cur = board.getLayout();
     draft = {
       cols: cur.columns.map(c => ({ orig: c.name, name: c.name, hint: c.hint })),
@@ -327,6 +328,7 @@
   $('wcLayoutCancel').addEventListener('click', () => ldlg.close());
 
   $('wcLayoutSave').addEventListener('click', async () => {
+    if (!canManage || !current || current.role === 'viewer') return;
     const clean = rows => rows.map(r => ({ orig: r.orig, name: r.name.trim().slice(0, 30), hint: r.hint.trim().slice(0, 80) }));
     const cols = clean(draft.cols), lanes = clean(draft.lanes);
     for (const list of [cols, lanes]) {

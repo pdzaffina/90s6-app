@@ -87,14 +87,57 @@ function setTab(v){
  $('ainboxWorkspace').hidden=v==='rules';document.querySelector('.ainbox-filters').hidden=v==='rules';$('ainboxRules').hidden=v!=='rules';$('ainboxScan').hidden=v!=='rules'||!allowedAdmin();
  if(v==='rules')loadRules();else load();
 }
+function openRuleEditor(rule){
+ if(!rule)return;
+ const panel=$('ainboxRuleEditor');
+ const cfg=rule.configuration||{};
+ const extra=rule.evaluator_type==='KB-002'
+  ?'<label>Maximum draft age (days)<input name="threshold" type="number" min="1" max="3650" required></label>'
+  :rule.evaluator_type==='WORK-001'
+  ?'<label>Organization timezone<input name="timezone" type="text" maxlength="100" required placeholder="America/Chicago"></label>'
+  :'<label>Active initiative statuses<input name="statuses" type="text" required placeholder="active, in progress"><small>Separate statuses with commas.</small></label>';
+ panel.hidden=false;
+ panel.innerHTML='<div class="ainbox-rule-editor-heading"><div><small>RULE CONFIGURATION</small><h3>'+esc(rule.rule_key)+' · '+esc(rule.name)+'</h3><p>Update settings and publish a new rule version.</p></div><button type="button" class="ainbox-rule-close" id="ainboxRuleClose" aria-label="Close rule editor">×</button></div><form id="ainboxRuleForm"><label class="ainbox-rule-toggle"><input type="checkbox" name="enabled"><span>Rule enabled<small>Disabled rules cannot be scanned.</small></span></label><div class="ainbox-rule-fields"><label>Evaluation interval (minutes)<input name="interval" type="number" min="15" max="525600" step="1" required><small>Minimum 15 minutes.</small></label>'+extra+'</div><p class="ainbox-rule-error" id="ainboxRuleError" role="alert" hidden></p><div class="ainbox-rule-actions"><button type="button" id="ainboxRuleCancel">Cancel</button><button type="submit" class="ainbox-rule-save" id="ainboxRuleSave">Save changes</button></div></form>';
+ const form=$('ainboxRuleForm');
+ form.elements.enabled.checked=!!rule.enabled;
+ form.elements.interval.value=rule.scan_interval_minutes||360;
+ if(rule.evaluator_type==='KB-002')form.elements.threshold.value=cfg.threshold_days??5;
+ else if(rule.evaluator_type==='WORK-001')form.elements.timezone.value=cfg.timezone||'UTC';
+ else form.elements.statuses.value=(cfg.active_statuses||['active']).join(', ');
+ const close=()=>{panel.hidden=true;panel.replaceChildren()};
+ $('ainboxRuleClose').onclick=close;$('ainboxRuleCancel').onclick=close;
+ form.onsubmit=async event=>{
+  event.preventDefault();
+  const error=$('ainboxRuleError');error.hidden=true;
+  const interval=Number(form.elements.interval.value);
+  if(!Number.isInteger(interval)||interval<15||interval>525600){error.textContent='Enter an interval between 15 and 525,600 minutes.';error.hidden=false;return}
+  const next={...cfg};
+  if(rule.evaluator_type==='KB-002'){
+   const days=Number(form.elements.threshold.value);
+   if(!Number.isInteger(days)||days<1||days>3650){error.textContent='Draft age must be between 1 and 3,650 days.';error.hidden=false;return}
+   next.threshold_days=days;
+  }else if(rule.evaluator_type==='WORK-001'){
+   const zone=form.elements.timezone.value.trim();
+   try{new Intl.DateTimeFormat('en-US',{timeZone:zone})}catch{error.textContent='Enter a valid IANA timezone, such as America/Chicago.';error.hidden=false;return}
+   next.timezone=zone;
+  }else{
+   const statuses=form.elements.statuses.value.split(',').map(x=>x.trim()).filter(Boolean);
+   if(!statuses.length){error.textContent='Enter at least one active initiative status.';error.hidden=false;return}
+   next.active_statuses=[...new Set(statuses)];
+  }
+  const save=$('ainboxRuleSave');save.disabled=true;save.textContent='Saving…';
+  try{
+   await rpc('ainbox_configure_rule',{p_tenant:tenant,p_rule:rule.id,p_enabled:form.elements.enabled.checked,p_interval:interval,p_config:next});
+   close();await loadRules();msg('Saved '+rule.rule_key+' configuration.');
+  }catch(e){error.textContent='Could not save: '+e.message;error.hidden=false;save.disabled=false;save.textContent='Save changes'}
+ };
+ panel.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
 async function loadRules(){
  const el=$('ainboxRulesList');el.textContent='Loading rules…';
  try{rules=await rpc('ainbox_get_rules',{p_tenant:tenant});el.innerHTML=rules.length?rules.map(r=>`<article><strong>${esc(r.rule_key)} · ${esc(r.name)}</strong><p>${esc(r.evaluator_type)} · ${r.enabled?'Enabled':'Disabled'} · Every ${esc(r.scan_interval_minutes)} minutes</p><button type="button" data-run="${esc(r.id)}" ${!r.enabled?'disabled':''}>Run now</button> <button type="button" data-config="${esc(r.id)}">Configure</button></article>`).join('') :'<p>No rules configured. Initialize the three standard rules to begin.</p><button type="button" id="ainboxBootstrap">Initialize rules</button>';
  const boot=$('ainboxBootstrap');if(boot)boot.onclick=async()=>{boot.disabled=true;try{await rpc('ainbox_bootstrap',{p_tenant:tenant,p_owner:user.id});await loadRules()}catch(e){msg(e.message)}finally{boot.disabled=false}};
- el.querySelectorAll('[data-config]').forEach(b=>b.onclick=async()=>{const rule=rules.find(x=>x.id===b.dataset.config);if(!rule)return;const enabled=confirm('Enable '+rule.rule_key+'? Select Cancel to disable.');const value=prompt('Evaluation interval in minutes (minimum 15)',String(rule.scan_interval_minutes));if(value===null)return;const minutes=Number(value);if(!Number.isInteger(minutes)||minutes<15){msg('Invalid interval');return}
- let cfg={...rule.configuration};if(rule.evaluator_type==='KB-002'){const t=prompt('Maximum Draft age in calendar days',String(cfg.threshold_days||5));if(t===null)return;cfg.threshold_days=Number(t)}else if(rule.evaluator_type==='WORK-001'){const t=prompt('IANA organization timezone',cfg.timezone||'UTC');if(t===null)return;cfg.timezone=t}else{const t=prompt('Comma-separated active initiative statuses',(cfg.active_statuses||['active']).join(','));if(t===null)return;cfg.active_statuses=t.split(',').map(x=>x.trim()).filter(Boolean)}
- try{await rpc('ainbox_configure_rule',{p_tenant:tenant,p_rule:rule.id,p_enabled:enabled,p_interval:minutes,p_config:cfg});await loadRules()}catch(e){msg(e.message)}
- });
+ el.querySelectorAll('[data-config]').forEach(b=>b.onclick=()=>openRuleEditor(rules.find(x=>x.id===b.dataset.config)));
  el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('');showScanResult(res,rules.find(x=>x.id===b.dataset.run));await loadRules()}catch(e){msg('Scan failed: '+e.message)}finally{b.disabled=false}});
  }catch(e){el.textContent='Rules are unavailable: '+e.message}
 }

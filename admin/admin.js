@@ -41,6 +41,8 @@
           btn(u.is_admin ? 'Remove admin' : 'Make admin', '', () => act('set_admin', { id: u.id, is_admin: !u.is_admin })),
           btn(u.is_superuser ? 'Remove superuser' : 'Make superuser', '', () => act('set_superuser', { id: u.id, is_superuser: !u.is_superuser })),
           btn(u.disabled ? 'Enable' : 'Disable', '', () => act('set_disabled', { id: u.id, disabled: !u.disabled })),
+          btn('Reset tour', '', () => act('reset_onboarding', { id: u.id, kind: 'tour' }).then(() => say('Guided tour reset for ' + u.email + '.'))),
+          btn('Reset intro', '', () => act('reset_onboarding', { id: u.id, kind: 'intro' }).then(() => say('Intro presentation reset for ' + u.email + '.'))),
           btn('Delete', 'danger', () => act('delete_user', { id: u.id }, 'Delete ' + u.email + '? This cannot be undone.'))
         );
       }

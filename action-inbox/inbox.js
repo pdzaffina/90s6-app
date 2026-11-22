@@ -16,7 +16,7 @@ function displayCachedAI(entry){
 async function restoreAI(scope,request){
  if(!aiUserId||!tenant)return;
  const {data,error}=await sb.from('ainbox_ai_assessment_cache').select('assessment,model,generated_at').eq('user_id',aiUserId).eq('tenant_id',tenant).eq('scope_key',aiScopeDb()).maybeSingle();
- if(error){console.warn('Could not restore AI assessment',error.message);return;}
+ if(error){msg('Could not restore saved AI assessment: '+error.message,'warning');return;}
  if(scope===aiScope&&request===aiRequest&&data)displayCachedAI(data);
 }
 
@@ -209,8 +209,9 @@ $('ainboxGenerateAI').onclick=async()=>{
   if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');
   const record={user_id:aiUserId,tenant_id:tenant,scope_key:aiScopeDb(),assessment:data.assessment,model:data.model||null,generated_at:data.generated_at||new Date().toISOString()};
   displayCachedAI(record);
-  const {error:saveError}=await sb.from('ainbox_ai_assessment_cache').upsert(record,{onConflict:'user_id,tenant_id,scope_key'});
-  if(saveError)msg('Assessment generated, but could not be saved for later: '+saveError.message,'warning');
+  const {data:saved,error:saveError}=await sb.from('ainbox_ai_assessment_cache').upsert(record,{onConflict:'user_id,tenant_id,scope_key'}).select('assessment,model,generated_at').single();
+  if(saveError){msg('Assessment generated but NOT saved: '+saveError.message,'error');}
+  else if(saved&&scope===aiScope&&request===aiRequest){displayCachedAI(saved);msg('AI assessment saved. It will be restored when you return.','success');}
  }catch(e){if(scope===aiScope&&request===aiRequest){if(previous){displayCachedAI(previous);msg('New AI assessment unavailable: '+e.message+' Showing the previously saved assessment.','warning');}else output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}}
  finally{button.disabled=false;button.textContent='Generate assessment';}
 };

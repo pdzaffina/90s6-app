@@ -5,19 +5,24 @@ if(!form)return;
 const say=(message,error=false)=>{status.textContent=message;status.className='ap-msg'+(error?' err':'');};
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data;};
 let allowed=false;
-$('globalAiTestType').onchange=()=>{$('globalAiAlternateWrap').hidden=$('globalAiTestType').value!=='alternate';};
+const updateReasoning=()=>{const model=$('globalAiTestType').value==='alternate'?$('globalAiAlternateModel').value:$('globalAiModel').value;const supports=model.startsWith('openai/gpt-oss-');$('globalAiReasoning').disabled=!supports;if(!supports)$('globalAiReasoning').value='auto';};
+$('globalAiAlternateModel').onchange=updateReasoning;
+$('globalAiModel').onchange=updateReasoning;
+$('globalAiTestType').onchange=()=>{$('globalAiAlternateWrap').hidden=$('globalAiTestType').value!=='alternate';updateReasoning();};
 $('globalAiTest').onclick=async()=>{
  if(!allowed)return;
  const button=$('globalAiTest'),output=$('globalAiTestResult');
  button.disabled=true;output.textContent='Testing saved model with a minimal request (up to 60 seconds)…';
  try{
-  const {data,error}=await App.sb.functions.invoke('ainbox-ai-diagnostic',{body:{test:$('globalAiTestType').value,model:$('globalAiAlternateModel').value}});
+  const {data,error}=await App.sb.functions.invoke('ainbox-ai-diagnostic',{body:{test:$('globalAiTestType').value,model:$('globalAiAlternateModel').value,tokens:Number($('globalAiTestTokens').value),reasoning:$('globalAiReasoning').value}});
   if(error){let message=error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
   if(data?.error)throw Error(data.error);
   const fmt=ms=>ms===null||ms===undefined?'not reached':(ms/1000).toFixed(3)+' seconds';
   output.textContent=[
    'Test: '+(data.test??'minimal'),
    'Model: '+data.model,
+   'Token budget: '+(data.token_budget??'not provided'),
+   'Reasoning control: '+(data.reasoning_control??'provider default'),
    'HTTP status: '+(data.http_status??'no provider response'),
    'Time to response headers: '+fmt(data.headers_ms),
    'Time to first streamed token: '+fmt(data.first_token_ms),
@@ -49,11 +54,13 @@ async function refreshModels(selected){
   else if(data.models.some(m=>m.id!==selected))alternate.value=data.models.find(m=>m.id!==selected).id;
   if(selected&&!data.models.some(m=>m.id===selected))picker.add(new Option('Currently configured: '+selected,selected));
   picker.value=selected&&Array.from(picker.options).some(x=>x.value===selected)?selected:data.models[0].id;
+  updateReasoning();
   say(data.models.length+' provider models loaded. Some may not support chat completions.');
  }catch(e){
   picker.replaceChildren(new Option('GPT-OSS 20B (fallback)','openai/gpt-oss-20b'),new Option('GPT-OSS 120B (fallback)','openai/gpt-oss-120b'));
   if(selected&&!Array.from(picker.options).some(x=>x.value===selected))picker.add(new Option('Currently configured: '+selected,selected));
   picker.value=selected||'openai/gpt-oss-20b';
+  updateReasoning();
   say('Provider model discovery unavailable: '+e.message+'. Showing fallback choices.',true);
  }finally{button.disabled=false;picker.disabled=false;}
 }

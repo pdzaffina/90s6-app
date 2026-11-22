@@ -118,19 +118,29 @@
     catch (e) { say(e.message, true); }
   }
 
+  const updateBulkMembershipControls=()=>{
+    const remove=$('assignAction').value==='remove';
+    $('assignRole').disabled=remove;
+    $('assignActive').disabled=remove;
+    $('assignUsersOrg').textContent=remove?'Remove selected users':'Apply to selected users';
+  };
+  $('assignAction').addEventListener('change',updateBulkMembershipControls);
+  updateBulkMembershipControls();
   $('assignUsersOrg').onclick=async()=>{
     const ids=Array.from(document.querySelectorAll('.feature-user-check:checked'),x=>x.value);
     const tenant=$('assignOrganization').value,role=$('assignRole').value;
+    const action=$('assignAction').value,active=$('assignActive').value==='active';
     const msg=$('assignUsersMsg');
     if(!tenant||!ids.length){msg.textContent='Select users and an organization.';return;}
-    if(!confirm('Assign '+ids.length+' users to this organization?'))return;
+    const description=action==='remove'?'Remove organization access for':(active?'Activate or assign':'Assign as inactive');
+    if(!confirm(description+' '+ids.length+' selected user(s)? Global account access will not change.'))return;
     $('assignUsersOrg').disabled=true;
     try{
-      const {data,error}=await App.sb.rpc('global_assign_tenant_members',{p_tenant:tenant,p_users:ids,p_role:role});
+      const {data,error}=await App.sb.rpc('global_bulk_manage_tenant_members',{p_tenant:tenant,p_users:ids,p_action:action,p_role:role,p_active:active});
       if(error)throw error;
-      msg.textContent=data+' users assigned. Memberships in other organizations were preserved.';
+      msg.textContent=data+' organization memberships '+(action==='remove'?'deactivated':active?'activated or assigned':'set inactive')+'.';
       await load();
-    }catch(e){msg.textContent=e.message;}
+    }catch(e){msg.textContent='Membership update failed: '+e.message;}
     finally{$('assignUsersOrg').disabled=false;}
   };
   $('inviteForm').addEventListener('submit', async e => {

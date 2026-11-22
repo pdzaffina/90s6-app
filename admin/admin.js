@@ -110,7 +110,7 @@
       if (file.size > 256 * 1024) throw new Error('CSV must be under 256 KB.');
       const rows = parseCsv((await file.text()).replace(/^\\uFEFF/, ''));
       const header = (rows.shift() || []).map(x => x.trim().toLowerCase());
-      for (const name of ['email', 'full_name', 'password', 'role']) {
+      for (const name of ['email', 'full_name', 'password', 'role', 'active']) {
         if (!header.includes(name)) throw new Error('Missing CSV column: ' + name);
       }
       if (rows.length < 1 || rows.length > 100) throw new Error('Upload 1 to 100 users per batch.');
@@ -119,33 +119,33 @@
         if (values.length !== header.length) throw new Error('Wrong number of columns on data row ' + (i + 2));
         const u = Object.fromEntries(header.map((key, j) => [key, values[j]]));
         u.email = u.email.trim().toLowerCase();
-        u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase();
+        u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase(); u.active = u.active.trim().toUpperCase();
         if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(u.email)) throw new Error('Invalid email on row ' + (i + 2));
         if (seen.has(u.email)) throw new Error('Duplicate email on row ' + (i + 2));
         if (!['user', 'superuser', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
-        if (!u.full_name || u.password.length < 12) throw new Error('Name required and password must be at least 12 characters on row ' + (i + 2));
+        if (!['Y', 'N'].includes(u.active)) throw new Error('Active must be Y or N on row ' + (i + 2));\n        if (u.password && u.password.length < 12) throw new Error('Password must be at least 12 characters when supplied on row ' + (i + 2));
         seen.add(u.email); return u;
       });
       bulkUsers.forEach(u => $('bulkRows').append(el('tr', {},
         el('td', { textContent: u.email }), el('td', { textContent: u.full_name }),
-        el('td', { textContent: u.role }), el('td', { textContent: 'Ready' }))));
+        el('td', { textContent: u.role }), el('td', { textContent: u.active }), el('td', { textContent: 'Ready' }))));
       $('bulkPreview').hidden = false; $('bulkCreate').disabled = false;
-      bulkSay(bulkUsers.length + ' users ready. Review before creating.');
+      bulkSay(bulkUsers.length + ' users ready. Review before applying.');
     } catch (err) { bulkUsers = []; bulkSay(err.message, true); }
   });
   $('bulkCreate').addEventListener('click', async () => {
-    if (!bulkUsers.length || !confirm('Create ' + bulkUsers.length + ' user accounts?')) return;
+    if (!bulkUsers.length || !confirm('Apply ' + bulkUsers.length + ' user rows? Existing accounts will only have their active status updated.')) return;
     $('bulkCreate').disabled = true;
-    bulkSay('Creating accounts...');
+    bulkSay('Applying changes...');
     try {
       const { results } = await call('bulk_create', { users: bulkUsers });
-      let success = 0, skipped = 0, failed = 0;
+      let success = 0, updated = 0, skipped = 0, failed = 0;
       (results || []).forEach((r, i) => {
-        const status = r.status === 'created' ? 'Created' : r.status === 'skipped' ? 'Skipped' : 'Failed';
-        if (r.status === 'created') success++; else if (r.status === 'skipped') skipped++; else failed++;
-        $('bulkRows').rows[i].cells[3].textContent = status + (r.error ? ': ' + r.error : '');
+        const status = r.status === 'created' ? 'Created' : r.status === 'updated' ? 'Updated' : r.status === 'skipped' ? 'Skipped' : 'Failed';
+        if (r.status === 'created') success++; else if (r.status === 'updated') updated++; else if (r.status === 'skipped') skipped++; else failed++;
+        $('bulkRows').rows[i].cells[4].textContent = status + (r.error ? ': ' + r.error : '');
       });
-      bulkSay(success + ' created, ' + skipped + ' skipped, ' + failed + ' failed.');
+      bulkSay(success + ' created, ' + updated + ' updated, ' + skipped + ' skipped, ' + failed + ' failed.');
       bulkUsers = []; $('bulkCsv').value = '';
       await load();
     } catch (err) { bulkSay(err.message, true); }

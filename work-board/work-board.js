@@ -341,7 +341,7 @@
     rows.forEach((r, i) => {
       const name = el('input', { value: r.name, maxLength: 30, placeholder: 'Name' });
       const hint = el('input', { value: r.hint, maxLength: 80, placeholder: 'Short description (optional)' });
-      const completion = kind==='cols' ? el('label', { textContent: 'Completion column ' }) : null;
+      const completion = null;
       if(completion){const check=el('input',{type:'checkbox',checked:!!r.is_completion});check.addEventListener('change',()=>r.is_completion=check.checked);completion.append(check)}
       name.addEventListener('input', () => { r.name = name.value; });
       hint.addEventListener('input', () => { r.hint = hint.value; });

@@ -100,3 +100,7 @@ erDiagram
 
 ## Sources of truth
 `supabase/setup.sql`; `supabase/migrations/20261121_organization_tenant_foundation.sql`; `20261122_tenant_application_permissions.sql`; `20261122_tenant_board_portfolio_rls.sql`; and subsequent migrations.
+
+## Action Inbox extension
+
+The twelve tenant-scoped `ainbox_*` tables and their relationships are documented in the [Action Inbox ERD](action-inbox-erd.md). Work Board item references remain logical references into `boards.data` JSONB. The source of truth for the Action Inbox schema is its migration series.

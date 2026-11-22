@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data};
 const money=v=>'$'+Number(v||0).toFixed(4);
-let authorized=false;let evaluationRuns={A:null,B:null};
+let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};
 async function load(){
  if(!authorized)return;
  $('error').textContent='';
@@ -41,6 +41,9 @@ async function loadAudit(){
    button.disabled=true;
    try{
     const detail=await rpc('ai_audit_inspect',{p_usage:a.usage_id});
+    selectedAudit=a;
+    $('replayOutput').hidden=true;
+    $('replayStatus').textContent='';
     $('auditMeta').textContent='Request '+a.usage_id+' · Organization '+a.tenant_id+' · User '+a.user_id+' · '+(a.error_message||'No recorded provider error');
     $('auditRequest').textContent=JSON.stringify(detail.request_payload,null,2);
     $('auditResponse').textContent=detail.response_payload==null?'No provider response recorded':JSON.stringify(detail.response_payload,null,2);
@@ -127,6 +130,19 @@ $('gatewayRun').onclick=async()=>{
   $('gatewayOutput').textContent=result.content;$('gatewayStatus').textContent=result.model+' · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · Audit '+result.usage_id;
   await loadAudit()
  }catch(e){$('gatewayStatus').textContent='Request failed: '+e.message}
+ finally{button.disabled=false}
+};
+$('replayOriginal').onclick=async()=>{
+ if(!selectedAudit)return;
+ const button=$('replayOriginal');button.disabled=true;$('replayStatus').textContent='Replaying original request...';
+ try{
+  const source=await rpc('ai_replay_source',{p_usage:selectedAudit.usage_id});
+  if(!source)throw Error('Source prompt no longer available');
+  const result=await invokeGateway({tenant_id:source.tenant_id,component:'replay',source_usage_id:selectedAudit.usage_id,model:source.model});
+  $('replayOutput').textContent=result.content;$('replayOutput').hidden=false;
+  $('replayStatus').textContent='Replay '+result.usage_id+' · '+(result.input_tokens??'N/A')+' input tokens · '+(result.output_tokens??'N/A')+' output tokens · '+money(result.estimated_usd);
+  await loadAudit()
+ }catch(e){$('replayStatus').textContent='Replay failed: '+e.message}
  finally{button.disabled=false}
 };
 $('closeDetail').onclick=()=>{$('auditDetail').hidden=true};

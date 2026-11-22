@@ -112,7 +112,7 @@ async function renderDetail(x){
     if(data?.error)throw Error(data.error);
     if(selected!==x.id||detailTab!=='remediation')return;
     if(!Array.isArray(data.steps)||!data.steps.length)throw Error('No remediation steps returned');
-    field.value=data.steps.join('\\n');
+    field.value=data.steps.join('\n');
     status.textContent='Suggested steps ready. Review, edit, then Save plan to persist. No steps have been approved or completed.';
    }catch(e){status.textContent='AI planning unavailable: '+e.message}
    finally{button.disabled=false}

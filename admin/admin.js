@@ -56,11 +56,11 @@
         const chip=el('span',{className:'org-multi-chip'});
         const remove=el('button',{type:'button',className:'org-multi-remove',textContent:'×',title:'Remove '+org.name,'aria-label':'Remove '+org.name});
         remove.onclick=()=>change(org,false);
-        chip.append(document.createTextNode(org.name),remove);tags.append(chip);
+        chip.append(document.createTextNode(org.name+(memberships().find(m=>m.tenant_id===org.id)?.role==='tenant_admin'?' (Org Admin)':'')),remove);tags.append(chip);
       }
       allCheck.checked=allOrganizations.length>0&&chosen.length===allOrganizations.length;
       allCheck.indeterminate=chosen.length>0&&chosen.length<allOrganizations.length;
-      for(const org of allOrganizations)checks.get(org.id).checked=active(org.id);
+      for(const org of allOrganizations){checks.get(org.id).checked=active(org.id);const role=checks.get(org.id).parentElement.querySelector('select');if(role){role.disabled=!active(org.id);role.value=memberships().find(m=>m.tenant_id===org.id)?.role||'user';}}
     }
     async function change(org,enabled){
       if(busy||active(org.id)===enabled)return;
@@ -69,7 +69,7 @@
         const {error}=await App.sb.rpc('global_set_user_organization',{p_user:user.id,p_tenant:org.id,p_active:enabled});
         if(error)throw error;
         const rest=memberships().filter(m=>m.tenant_id!==org.id);
-        rest.push({tenant_id:org.id,name:org.name,status:enabled?'active':'inactive'});
+        rest.push({tenant_id:org.id,name:org.name,role:memberships().find(m=>m.tenant_id===org.id)?.role||'user',status:enabled?'active':'inactive'});
         organizationsByUser.set(user.id,rest);
         say((enabled?'Added ':'Removed ')+user.email+(enabled?' to ':' from ')+org.name);
       }catch(err){say(err.message,true);}
@@ -80,7 +80,20 @@
       const check=el('input',{type:'checkbox'});
       checks.set(org.id,check);
       check.onchange=()=>change(org,check.checked);
-      label.append(check,document.createTextNode(' '+org.name));menu.append(label);
+      label.append(check,document.createTextNode(' '+org.name+' '));
+      const role=document.createElement('select');role.className='ap-input';role.setAttribute('aria-label','Role in '+org.name);
+      for(const [value,name] of [['user','User'],['superuser','Superuser'],['tenant_admin','Org Admin']]){const o=document.createElement('option');o.value=value;o.textContent=name;role.append(o);}
+      role.value=memberships().find(m=>m.tenant_id===org.id)?.role||'user';
+      role.disabled=!active(org.id);
+      role.onchange=async()=>{
+        const old=memberships().find(m=>m.tenant_id===org.id)?.role||'user';
+        role.disabled=true;
+        const {error}=await App.sb.rpc('global_bulk_manage_tenant_members',{p_tenant:org.id,p_users:[user.id],p_action:'assign',p_role:role.value,p_active:true});
+        if(error){role.value=old;say(error.message,true);}
+        else{const m=memberships().find(m=>m.tenant_id===org.id);if(m)m.role=role.value;renderTags();say('Updated organization role for '+user.email);}
+        role.disabled=!active(org.id);
+      };
+      label.append(role);menu.append(label);
     }
     allCheck.onchange=async()=>{
       const desired=allCheck.checked;
@@ -131,12 +144,12 @@
   async function load() {
     say('Loading...');
     try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));
-      const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,tenant_id,status,tenants(name)').order('created_at');
+      const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,tenant_id,role,status,tenants(name)').order('created_at');
       if(membershipError)throw membershipError;
       organizationsByUser=new Map();
       for(const m of membershipData||[]){
         const a=organizationsByUser.get(m.user_id)||[];
-        a.push({tenant_id:m.tenant_id,name:m.tenants?.name||'Unknown',status:m.status});
+        a.push({tenant_id:m.tenant_id,name:m.tenants?.name||'Unknown',role:m.role,status:m.status});
         organizationsByUser.set(m.user_id,a);
       }
       users.forEach(u=>u.is_content_creator=!!roleMap.get(u.id));render(users); say(users.length + ' users'); }

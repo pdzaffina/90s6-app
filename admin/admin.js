@@ -34,38 +34,63 @@
   const fmt = d => (d ? new Date(d).toLocaleString() : 'Never');
 
   function organizationPicker(user) {
-    const memberships=organizationsByUser.get(user.id)||[];
-    const active=memberships.filter(m=>m.status==='active');
     const td=el('td');
-    const details=el('details',{className:'org-membership-picker'});
-    const summary=el('summary',{textContent:active.length?active.map(m=>m.name).join(', '):'None'});
-    summary.title='Click to manage organization membership for '+user.email;
-    const panel=el('div',{className:'ap-panel'});
-    if(!allOrganizations.length)panel.append(el('span',{textContent:'No organizations available'}));
-    for(const org of allOrganizations){
-      const membership=memberships.find(m=>m.tenant_id===org.id);
-      const label=el('label',{className:'ap-row'});
-      const checkbox=el('input',{type:'checkbox',checked:membership?.status==='active'});
-      checkbox.addEventListener('change',async()=>{
-        const previous=!checkbox.checked;
-        checkbox.disabled=true;
-        try{
-          const {error}=await App.sb.rpc('global_set_user_organization',{p_user:user.id,p_tenant:org.id,p_active:checkbox.checked});
-          if(error)throw error;
-          const next=organizationsByUser.get(user.id)||[];
-          const remaining=next.filter(m=>m.tenant_id!==org.id);
-          remaining.push({tenant_id:org.id,name:org.name,status:checkbox.checked?'active':'inactive'});
-          organizationsByUser.set(user.id,remaining);
-          const names=remaining.filter(m=>m.status==='active').map(m=>m.name);
-          summary.textContent=names.length?names.join(', '):'None';
-          say((checkbox.checked?'Added ':'Removed ')+user.email+(checkbox.checked?' to ':' from ')+org.name);
-        }catch(err){checkbox.checked=previous;say(err.message,true);}
-        finally{checkbox.disabled=false;}
-      });
-      label.append(checkbox,document.createTextNode(' '+org.name));
-      panel.append(label);
+    const picker=el('div',{className:'org-multi'});
+    const trigger=el('div',{className:'org-multi-trigger'});
+    const tags=el('div',{className:'org-multi-tags'});
+    const toggle=el('button',{type:'button',className:'org-multi-toggle',textContent:'▾',title:'Choose organizations','aria-label':'Choose organizations'});
+    const menu=el('div',{className:'org-multi-menu',hidden:true});
+    const selectAll=el('label',{className:'org-multi-option org-multi-all'});
+    const allCheck=el('input',{type:'checkbox'});
+    selectAll.append(allCheck,document.createTextNode(' Select all ('+allOrganizations.length+')'));
+    menu.append(selectAll);
+    const checks=new Map();
+    let busy=false;
+    const memberships=()=>organizationsByUser.get(user.id)||[];
+    const active=id=>memberships().some(m=>m.tenant_id===id&&m.status==='active');
+    function renderTags(){
+      tags.replaceChildren();
+      const chosen=allOrganizations.filter(o=>active(o.id));
+      if(!chosen.length)tags.append(el('span',{className:'org-multi-placeholder',textContent:'Choose organizations'}));
+      for(const org of chosen){
+        const chip=el('span',{className:'org-multi-chip'});
+        const remove=el('button',{type:'button',className:'org-multi-remove',textContent:'×',title:'Remove '+org.name,'aria-label':'Remove '+org.name});
+        remove.onclick=()=>change(org,false);
+        chip.append(document.createTextNode(org.name),remove);tags.append(chip);
+      }
+      allCheck.checked=allOrganizations.length>0&&chosen.length===allOrganizations.length;
+      allCheck.indeterminate=chosen.length>0&&chosen.length<allOrganizations.length;
+      for(const org of allOrganizations)checks.get(org.id).checked=active(org.id);
     }
-    details.append(summary,panel);td.append(details);return td;
+    async function change(org,enabled){
+      if(busy||active(org.id)===enabled)return;
+      busy=true;picker.classList.add('org-multi-busy');
+      try{
+        const {error}=await App.sb.rpc('global_set_user_organization',{p_user:user.id,p_tenant:org.id,p_active:enabled});
+        if(error)throw error;
+        const rest=memberships().filter(m=>m.tenant_id!==org.id);
+        rest.push({tenant_id:org.id,name:org.name,status:enabled?'active':'inactive'});
+        organizationsByUser.set(user.id,rest);
+        say((enabled?'Added ':'Removed ')+user.email+(enabled?' to ':' from ')+org.name);
+      }catch(err){say(err.message,true);}
+      finally{busy=false;picker.classList.remove('org-multi-busy');renderTags();}
+    }
+    for(const org of allOrganizations){
+      const label=el('label',{className:'org-multi-option'});
+      const check=el('input',{type:'checkbox'});
+      checks.set(org.id,check);
+      check.onchange=()=>change(org,check.checked);
+      label.append(check,document.createTextNode(' '+org.name));menu.append(label);
+    }
+    allCheck.onchange=async()=>{
+      const desired=allCheck.checked;
+      for(const org of allOrganizations)if(active(org.id)!==desired)await change(org,desired);
+      renderTags();
+    };
+    toggle.onclick=()=>{menu.hidden=!menu.hidden;toggle.setAttribute('aria-expanded',String(!menu.hidden));};
+    picker.addEventListener('keydown',e=>{if(e.key==='Escape'){menu.hidden=true;toggle.setAttribute('aria-expanded','false');toggle.focus();}});
+    document.addEventListener('click',e=>{if(!picker.contains(e.target)){menu.hidden=true;toggle.setAttribute('aria-expanded','false');}});
+    trigger.append(tags,toggle);picker.append(trigger,menu);td.append(picker);renderTags();return td;
   }
 
   function render(users) {

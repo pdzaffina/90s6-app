@@ -55,7 +55,7 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
+    <nav><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
     <select id="apTenantSelect" aria-label="Active organization" hidden></select><span class="who" id="apWho"></span>
     <button type="button" id="apOut">Sign out</button>`;
   document.body.prepend(nav);
@@ -68,7 +68,8 @@
   function renderNav() {
     nav.hidden = state !== 'in';
     if (state !== 'in') return;
-    $('apAdminLink').hidden = !profile.is_admin; // Tenant Admin UI pending authorization-aware implementation.
+    $('apAdminLink').hidden = !profile.is_admin;
+    $('apTenantAdminLink').hidden = !isTenantAdmin(); // Tenant Admin UI pending authorization-aware implementation.
     const tenantSelect = $('apTenantSelect');
     tenantSelect.replaceChildren();
     for (const m of tenantMemberships) { const o = document.createElement('option'); o.value=m.tenant_id; o.textContent=m.tenants?.name || m.tenant_id; tenantSelect.append(o); }

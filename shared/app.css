@@ -123,3 +123,11 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 #appNav .ap-wordmark{display:inline-flex;align-items:baseline;gap:0;background:transparent;color:#c4cbd5;padding:4px 12px 6px;border-radius:8px;font-family:var(--ap-font);font-size:34px;font-weight:900;line-height:1;letter-spacing:-2.6px;text-decoration:none}
 #appNav .ap-wordmark .ap-logo-s{color:#4c6bf0}
 @media(max-width:520px){#appNav .ap-wordmark{font-size:29px;padding:5px 9px;letter-spacing:-2.2px}}
+
+/* Quiet navigation: protect content while authentication resolves without flashing a login dialog. */
+#appGate.ap-pending{background:var(--ap-cloud);pointer-events:auto}
+#appGate.ap-pending .box{display:none}
+#appGate.ap-pending::before{content:"";position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,transparent,var(--ap-blue),transparent);background-size:45% 100%;background-repeat:no-repeat;animation:ap-nav-progress 1.15s ease-in-out infinite}
+#appGate[hidden]{display:none!important}
+@keyframes ap-nav-progress{0%{background-position:-85% 0}100%{background-position:185% 0}}
+@media(prefers-reduced-motion:reduce){#appGate.ap-pending::before{animation:none;background:var(--ap-blue)}}

@@ -108,18 +108,18 @@
   async function loadBoards() {
     await sb.rpc('claim_invites'); // turns pending invites for this email into access
     const [b, m] = await Promise.all([
-      sb.from('boards').select('id,name,owner_id').order('name'),
+      sb.from('boards').select('id,name,owner_id,tenant_id').eq('tenant_id',App.activeTenantId).order('name'),
       sb.from('board_members').select('board_id,role').eq('user_id', user.id)
     ]);
     if (b.error || m.error) throw (b.error || m.error);
     const roles = new Map(m.data.map(r => [r.board_id, r.role]));
-    boards = b.data.map(x => ({ ...x, role: x.owner_id === user.id ? 'owner' : (roles.get(x.id) || 'viewer') }));
+    boards = b.data.map(x => ({ ...x, role: (App.isTenantAdmin() || x.owner_id === user.id) ? 'owner' : (roles.get(x.id) || 'viewer') }));
   }
 
   async function openBoard(id, skipFlush) {
     if (!skipFlush) await flush();
     ready = false;
-    const { data, error } = await sb.from('boards').select('id,name,data,config,updated_at').eq('id', id).maybeSingle();
+    const { data, error } = await sb.from('boards').select('id,name,data,config,updated_at').eq('id', id).eq('tenant_id',App.activeTenantId).maybeSingle();
     if (error || !data) { toast('Could not open that board.'); return false; }
     current = boards.find(b => b.id === id);
     current.name = data.name;
@@ -168,8 +168,8 @@
     if (!name || !canManage) return;
     await flush();
     const { data, error } = await sb.from('boards')
-      .insert({ name: name.slice(0, 80), owner_id: user.id, data: [] })
-      .select('id,name,owner_id').single();
+      .insert({ name: name.slice(0, 80), owner_id: user.id, tenant_id: App.activeTenantId, data: [] })
+      .select('id,name,owner_id,tenant_id').single();
     if (error) return toast('Could not create board: ' + error.message);
     boards.push({ ...data, role: 'owner' });
     boards.sort((a, b) => a.name.localeCompare(b.name));
@@ -484,7 +484,7 @@
     }
     if (user && user.id === session.user.id) return; // token refresh, nothing to reload
     user = session.user;
-    canManage = !!(profile && (profile.is_admin || profile.is_superuser) && !profile.disabled);
+    canManage = !!(profile && App.canCreateResources() && !profile.disabled);
     $('wcCreateFirst').hidden = !canManage;
     showGate('loading');
     try { await loadBoards(); } catch (e) { toast('Could not load boards: ' + e.message); showGate('error'); return; }

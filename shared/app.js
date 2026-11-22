@@ -12,7 +12,17 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = ''; let features = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
+  let session = null, profile = null, state = 'unknown', notice = ''; let tenantMemberships = [], activeTenantId = null; let features = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
+
+  const tenantRole = (id = activeTenantId) => tenantMemberships.find(m => m.tenant_id === id)?.role || null;
+  const isTenantAdmin = (id = activeTenantId) => !!profile?.is_admin || tenantRole(id) === 'tenant_admin';
+  const canCreateResources = (id = activeTenantId) => !!profile?.is_admin || ['tenant_admin','superuser'].includes(tenantRole(id));
+  function setActiveTenant(id) {
+    if (!tenantMemberships.some(m => m.tenant_id === id)) throw new Error('Not a member of this tenant');
+    activeTenantId = id;
+    sessionStorage.setItem('90s6-active-tenant:' + profile.id, id);
+    location.reload();
+  }
 
   // ---------- Sign in gate ----------
   const gate = el('div', { id: 'appGate' });
@@ -45,19 +55,26 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
-    <span class="who" id="apWho"></span>
+    <nav><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
+    <select id="apTenantSelect" aria-label="Active organization" hidden></select><span class="who" id="apWho"></span>
     <button type="button" id="apOut">Sign out</button>`;
   document.body.prepend(nav);
   nav.querySelectorAll('nav a').forEach(a => {
     if (location.pathname.startsWith(a.getAttribute('href'))) a.setAttribute('aria-current', 'page');
   });
   $('apOut').addEventListener('click', () => signOut());
+  $('apTenantSelect').addEventListener('change', e => setActiveTenant(e.target.value));
 
   function renderNav() {
     nav.hidden = state !== 'in';
     if (state !== 'in') return;
     $('apAdminLink').hidden = !profile.is_admin;
+    $('apTenantAdminLink').hidden = !isTenantAdmin(); // Tenant Admin UI pending authorization-aware implementation.
+    const tenantSelect = $('apTenantSelect');
+    tenantSelect.replaceChildren();
+    for (const m of tenantMemberships) { const o = document.createElement('option'); o.value=m.tenant_id; o.textContent=m.tenants?.name || m.tenant_id; tenantSelect.append(o); }
+    tenantSelect.value=activeTenantId || '';
+    tenantSelect.hidden=tenantMemberships.length < 2;
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
     [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     $('apWho').textContent = profile.full_name || profile.email || '';
@@ -69,7 +86,7 @@
   async function handle(s) {
     if (!s) {
       const signedOutUserId = session?.user?.id;
-      session = null; profile = null; state = 'out';
+      session = null; profile = null; tenantMemberships=[]; activeTenantId=null; state = 'out';
       gate.hidden = false; $('apForm').hidden = false; msg(notice, !!notice); notice = '';
       renderNav(); emit(); return;
     }
@@ -84,7 +101,14 @@
       await sb.auth.signOut();
       return;
     }
-    profile = data; const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled); state = 'in';
+    profile = data;
+    const memberships = await sb.from('tenant_members').select('tenant_id,role,tenants(name)').eq('user_id',s.user.id).eq('status','active');
+    if (memberships.error) { notice='Could not load organization membership.'; session=null; await sb.auth.signOut(); return; }
+    tenantMemberships = memberships.data || [];
+    const preferred = sessionStorage.getItem('90s6-active-tenant:' + s.user.id);
+    activeTenantId = tenantMemberships.some(m => m.tenant_id === preferred) ? preferred : tenantMemberships[0]?.tenant_id || null;
+    if (!activeTenantId && !profile.is_admin) { notice='No active organization membership. Contact your administrator.'; session=null; await sb.auth.signOut(); return; }
+    const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled); state = 'in';
     const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/portfolio-management/')?'portfolio_management':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
     try {
@@ -136,6 +160,12 @@
   window.App = {
     sb,
     hasFeature,
+    get activeTenantId() { return activeTenantId; },
+    get tenantMemberships() { return [...tenantMemberships]; },
+    tenantRole,
+    isTenantAdmin,
+    canCreateResources,
+    setActiveTenant,
     signOut,
     onBeforeSignOut: cb => beforeOut.push(cb),
     onSession(cb) {

@@ -68,6 +68,9 @@ Deno.serve(async (req) => {
         return json({ error: 'Submit 1 to 100 users.' }, 400);
       const seen = new Set<string>();
       const entries = [];
+      const { data: orgs, error: orgError } = await db.from('tenants').select('id,slug,status');
+      if (orgError) return fail(orgError);
+      const tenantBySlug = new Map((orgs ?? []).filter(t => t.status === 'active').map(t => [t.slug, t.id]));
       for (const item of b.users) {
         if (!item || typeof item !== 'object') return json({ error: 'Invalid user entry.' }, 400);
         const v = item as Record<string, unknown>;
@@ -76,19 +79,35 @@ Deno.serve(async (req) => {
         const password = String(v.password ?? '');
         const role = String(v.role ?? '').trim().toLowerCase();
         const active = String(v.active ?? '').trim().toUpperCase();
+        const organization = String(v.organization ?? '').trim().toLowerCase();
+        if (organization !== 'global' && !tenantBySlug.has(organization)) return json({ error: 'Unknown or inactive organization: ' + organization }, 400);
+        if (organization === 'global' && role !== 'admin') return json({ error: 'Global rows must use the admin role.' }, 400);
+        if (organization !== 'global' && role === 'admin') return json({ error: 'Global admin role cannot be granted within an organization.' }, 400);
         if (!EMAIL.test(email) || email.length > 254 || !full_name || full_name.length > 200 ||
-            password.length > 128 || (password.length > 0 && password.length < 12) || !['Y', 'N'].includes(active) || !['user', 'superuser', 'admin'].includes(role) || seen.has(email))
+            password.length > 128 || (password.length > 0 && password.length < 12) || !['Y', 'N'].includes(active) || !['user', 'superuser', 'tenant_admin', 'admin'].includes(role) || seen.has(email + ':' + organization))
           return json({ error: 'Invalid or duplicate CSV entry. Each user needs a unique email, name, role, and active Y/N. Supplied passwords must be 12 to 128 characters.' }, 400);
-        seen.add(email); entries.push({ email, full_name, password, role, active });
+        seen.add(email + ':' + organization); entries.push({ email, full_name, password, role, active, organization });
       }
       const { data: existing, error: existingError } = await db.from('profiles').select('id,email,disabled').in('email', entries.map(v => v.email));
       if (existingError) return fail(existingError);
       const known = new Map((existing ?? []).map(v => [String(v.email).toLowerCase(), v]));
       const results = [];
       for (const entry of entries) {
-        const { email, full_name, password, role, active } = entry;
+        const { email, full_name, password, role, active, organization } = entry;
+        const tenantId = tenantBySlug.get(organization);
+        const applyMembership = async (uid: string) => {
+          if (!tenantId) return null;
+          const { error } = await db.from('tenant_members').upsert({ tenant_id: tenantId, user_id: uid, role, status: active === 'Y' ? 'active' : 'inactive' }, { onConflict: 'tenant_id,user_id' });
+          return error;
+        };
         const found = known.get(email);
         if (found) {
+          if (tenantId) {
+            const memberError = await applyMembership(found.id);
+            if (memberError) { results.push({ email, organization, status: 'failed', error: memberError.message }); continue; }
+            await log('admin.bulk_tenant_membership', email, { organization, role, active });
+            results.push({ email, organization, status: 'updated' }); continue;
+          }
           if (found.id === user.id) { results.push({ email, status: 'skipped', error: 'Cannot change your own account.' }); continue; }
           const disabled = active === 'N';
           if (found.disabled === disabled) { results.push({ email, status: 'skipped' }); continue; }
@@ -114,17 +133,19 @@ Deno.serve(async (req) => {
         const uid = data.user?.id;
         if (!uid) { results.push({ email, status: 'failed', error: 'No user ID returned.' }); continue; }
         const { error: profileError } = await db.from('profiles').upsert({
-          id: uid, email, full_name, is_admin: role === 'admin', is_superuser: role === 'superuser', disabled: active === 'N'
+          id: uid, email, full_name, is_admin: role === 'admin', is_superuser: false, disabled: organization === 'global' && active === 'N'
         }, { onConflict: 'id' });
         if (profileError) {
           results.push({ email, status: 'failed', error: 'Profile provisioning failed; account may need admin review.' });
           continue;
         }
-        if (active === 'N') {
+        const membershipError = await applyMembership(uid);
+        if (membershipError) { results.push({ email, organization, status: 'failed', error: 'Account created but organization membership failed: ' + membershipError.message }); continue; }
+        if (organization === 'global' && active === 'N') {
           const { error: banError } = await db.auth.admin.updateUserById(uid, { ban_duration: '876000h' });
           if (banError) { results.push({ email, status: 'failed', error: 'Account is inactive, but authentication ban failed.' }); continue; }
         }
-        await log('admin.bulk_create_user', email, { role, active });
+        await log('admin.bulk_create_user', email, { role, active, organization });
         known.set(email, { id: uid, email, disabled: active === 'N' });
         results.push({ email, status: 'created' });
       }

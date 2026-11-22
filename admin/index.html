@@ -28,7 +28,7 @@
 <input class="ap-input" id="auditActor" type="text" placeholder="Filter by user email" autocomplete="off">
 <button class="ap-btn primary" type="submit">Apply</button><button class="ap-btn" type="button" id="auditCsv">Export CSV</button></form>
 <p id="auditMsg" class="ap-msg"></p>
-<div class="ap-wrap"><table class="ap-table"><thead><tr><th>Time</th><th>Who</th><th>What</th></tr></thead><tbody id="auditRows"></tbody></table></div>
+<div class="ap-wrap" style="max-height:440px;overflow-y:auto;overscroll-behavior:contain;border:1px solid var(--border,#64757a);border-radius:8px"><table class="ap-table"><thead><tr><th style="position:sticky;top:0;z-index:1;background:var(--surface,#fff)">Time</th><th style="position:sticky;top:0;z-index:1;background:var(--surface,#fff)">Who</th><th style="position:sticky;top:0;z-index:1;background:var(--surface,#fff)">What</th></tr></thead><tbody id="auditRows"></tbody></table></div>
 <p><button class="ap-btn" type="button" id="auditMore" hidden>Load more</button></p></section>
 </div>
 </main>

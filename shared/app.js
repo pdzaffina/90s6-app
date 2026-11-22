@@ -54,15 +54,24 @@
   // ---------- Nav bar ----------
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
-    <a class="brand" href="/">90S6 App</a>
-    <nav><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Admin</a><a href="/profile/">My Profile</a></nav>
-    <select id="apTenantSelect" aria-label="Active organization" hidden></select><span class="who" id="apWho"></span>
-    <button type="button" id="apOut">Sign out</button>`;
+    <div class="ap-nav-top">
+      <a class="brand" href="/" aria-label="90S6 home">90S6<span class="ap-brand-accent"> App</span></a>
+      <div class="ap-nav-account">
+        <div class="ap-org-control"><span class="ap-org-label">ORGANIZATION</span><span class="ap-org-icon" aria-hidden="true">▦</span><select id="apTenantSelect" aria-label="Active organization"></select><span id="apTenantName" class="ap-tenant-name" hidden></span><span id="apOrgChevron" class="ap-org-chevron" aria-hidden="true">⌄</span></div>
+        <div class="ap-user-menu"><button type="button" id="apUserButton" aria-expanded="false" aria-controls="apUserDropdown" aria-label="Account menu"><span id="apAvatar" class="ap-avatar">U</span><span class="who" id="apWho"></span><span class="ap-user-chevron" aria-hidden="true">⌄</span></button>
+          <div id="apUserDropdown" class="ap-user-dropdown" hidden><a href="/profile/">My Profile</a><button type="button" id="apOut">Sign out</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
   document.body.prepend(nav);
   nav.querySelectorAll('nav a').forEach(a => {
     if (location.pathname.startsWith(a.getAttribute('href'))) a.setAttribute('aria-current', 'page');
   });
   $('apOut').addEventListener('click', () => signOut());
+  $('apUserButton').addEventListener('click', () => { const menu=$('apUserDropdown');menu.hidden=!menu.hidden;$('apUserButton').setAttribute('aria-expanded',String(!menu.hidden)); });
+  document.addEventListener('click', e => { if (!e.target.closest('#appNav .ap-user-menu')) { $('apUserDropdown').hidden=true;$('apUserButton').setAttribute('aria-expanded','false'); } });
+  document.addEventListener('keydown', e => { if(e.key==='Escape'){$('apUserDropdown').hidden=true;$('apUserButton').setAttribute('aria-expanded','false');} });
   $('apTenantSelect').addEventListener('change', e => setActiveTenant(e.target.value));
 
   function renderNav() {
@@ -74,10 +83,15 @@
     tenantSelect.replaceChildren();
     for (const m of tenantMemberships) { const o = document.createElement('option'); o.value=m.tenant_id; o.textContent=m.tenants?.name || m.tenant_id; tenantSelect.append(o); }
     tenantSelect.value=activeTenantId || '';
-    tenantSelect.hidden=tenantMemberships.length < 2;
+    const multipleOrgs=tenantMemberships.length>1;
+    tenantSelect.hidden=!multipleOrgs;
+    $('apTenantName').hidden=multipleOrgs;
+    $('apTenantName').textContent=tenantMemberships.find(m=>m.tenant_id===activeTenantId)?.tenants?.name || (profile.is_admin?'Global Administration':'No organization');
+    $('apOrgChevron').hidden=!multipleOrgs;
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
     [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     $('apWho').textContent = profile.full_name || profile.email || '';
+    $('apAvatar').textContent=(profile.full_name || profile.email || 'U').split(/[\\s@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('');
   }
 
   // ---------- Session handling ----------

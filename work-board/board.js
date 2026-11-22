@@ -61,17 +61,34 @@ function exportWbsExcel(){
  window.XLSX.writeFile(wb,boardName+'-WBS-'+new Date().toISOString().slice(0,10)+'.xlsx');
 }
 $('exportWbsBtn').addEventListener('click',exportWbsExcel);
+let wbsEditing=false;
 function renderWbs(){const query=$('searchInput').value.trim().toLowerCase();const filtering=!!query;const byId=new Map(data.map(x=>[x.id,x]));const hit=x=>(!query||[x.title,x.description,x.owner].join(' ').toLowerCase().includes(query));let keep=null;if(filtering){keep=new Set();for(const x of data)if(hit(x)){let p=x;while(p&&!keep.has(p.id)){keep.add(p.id);p=byId.get(p.parent)}}}
 const rows=flatten(kidsOf(),keep,x=>filtering||!collapsed.has(x.id));const wrap=$('wbs');wrap.replaceChildren();
-const top=node('div','wbsTop');const left=node('div','wbsAct wbs-edit');const addTop=node('button','primary','+ Add top-level task');addTop.type='button';addTop.addEventListener('click',()=>openEditor());left.append(addTop);
+const top=node('div','wbsTop');const left=node('div','wbsAct wbs-edit');const addTop=node('button','primary','+ Add top-level task');addTop.type='button';addTop.addEventListener('click',()=>openEditor());left.append(addTop);const toggle=node('button',wbsEditing?'primary':'',''+(wbsEditing?'Done editing':'Edit WBS'));toggle.type='button';toggle.addEventListener('click',()=>{wbsEditing=!wbsEditing;render()});left.append(toggle);
 const right=node('div','wbsAct');const ex=node('button','','Expand all');ex.type='button';ex.addEventListener('click',()=>{collapsed.clear();render()});const co=node('button','','Collapse all');co.type='button';co.addEventListener('click',()=>{data.forEach(x=>{if(data.some(a=>a.parent===x.id))collapsed.add(x.id)});render()});right.append(ex,co);top.append(left,right);wrap.append(top);
 const table=node('table');const head=node('tr');['WBS','Task','Owner','Column','Swimlane','Size','Due','Files',''].forEach(t=>head.append(node('th','',t)));const thead=node('thead');thead.append(head);const tbody=node('tbody');
 for(const r of rows){const x=r.x;const tr=node('tr');tr.append(node('td','wbsNum',r.num));
 const tt=node('td');const w=node('div','wbsTask');w.style.paddingLeft=(r.depth*22)+'px';
 if(r.n){const tg=node('button','tg',(!filtering&&collapsed.has(x.id))?'\u25B8':'\u25BE');tg.type='button';tg.setAttribute('aria-label','Toggle subtasks of '+x.title);tg.addEventListener('click',()=>{collapsed.has(x.id)?collapsed.delete(x.id):collapsed.add(x.id);render()});w.append(tg)}else w.append(node('span','tg'));
-w.append(node('span','',x.title));if(r.n)w.append(node('span','crumb','('+r.n+')'));tt.append(w);tr.append(tt);
+if(wbsEditing&&!document.body.classList.contains('readonly')){const inp=node('input');inp.value=x.title;inp.maxLength=140;inp.setAttribute('aria-label','Work item name');inp.addEventListener('change',()=>{const v=inp.value.trim();if(!v){inp.value=x.title;showToast('Work item name is required');return}x.title=v;save();render()});w.append(inp)}else w.append(node('span','',x.title));if(r.n)w.append(node('span','crumb','('+r.n+')'));tt.append(w);tr.append(tt);
 
-[x.owner,x.when,x.kind,x.effort,x.due].forEach(v=>tr.append(node('td','',v||'')));
+const editable=wbsEditing&&!document.body.classList.contains('readonly');
+const fields=[
+ ['owner',null,80],['when',WHEN],['kind',KIND],['effort',['Small','Medium','Large']],['due',null]
+];
+fields.forEach(([field,options,max])=>{
+ const td=node('td');
+ if(!editable){td.textContent=x[field]||''}
+ else {
+  let control;
+  if(options){control=node('select');options.forEach(value=>{const opt=node('option','',value);opt.value=value;control.append(opt)});control.value=x[field]}
+  else {control=node('input');control.type=field==='due'?'date':'text';control.value=x[field]||'';if(max)control.maxLength=max}
+  control.setAttribute('aria-label',field+' for '+x.title);
+  control.addEventListener('change',()=>{const value=control.value.trim();if(field==='when'||field==='kind'||field==='effort'){if(!options.includes(value))return}x[field]=value;save();});
+  td.append(control);
+ }
+ tr.append(td);
+});
 const ft=node('td');ft.append(chips(x));tr.append(ft);
 const at=node('td');const ab=node('div','wbsAct wbs-edit');const sub=node('button','','+ Sub');sub.type='button';sub.addEventListener('click',()=>openEditor(null,x.when,x.kind,x.id));const ed=node('button','','Edit');ed.type='button';ed.addEventListener('click',()=>openEditor(x.id));ab.append(sub,ed);at.append(ab);tr.append(at);tbody.append(tr)}
 if(!rows.length){const tr=node('tr');const td=node('td','','No tasks match.');td.colSpan=9;tr.append(td);tbody.append(tr)}

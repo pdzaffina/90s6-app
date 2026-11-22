@@ -4,7 +4,7 @@ const headers = {"content-type":"application/json","cache-control":"no-store","a
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const modelDefault="openai/gpt-oss-20b";
-Deno.serve(async(req)=>{
+Deno.serve(async(req)=>{\n if(req.method==="OPTIONS")return new Response(null,{status:204,headers});
  if(req.method!=="POST")return respond({error:"Method not allowed"},405);
  const auth=req.headers.get("authorization")||"";
  if(!/^Bearer\s+\S+$/i.test(auth))return respond({error:"Authentication required"},401);

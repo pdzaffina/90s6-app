@@ -1,6 +1,6 @@
 import { createClient } from "npm:@supabase/supabase-js@2.57.0";
 
-const headers = {"content-type":"application/json","cache-control":"no-store"};
+const headers = {"content-type":"application/json","cache-control":"no-store","access-control-allow-origin":"https://app.90s6.com","access-control-allow-headers":"authorization, apikey, x-client-info, content-type","access-control-allow-methods":"POST, OPTIONS"};
 const respond=(data:unknown,status=200)=>new Response(JSON.stringify(data),{status,headers});
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const modelDefault="openai/gpt-oss-20b";

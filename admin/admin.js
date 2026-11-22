@@ -27,7 +27,7 @@
     const { data, error } = await App.sb.from('tenants').select('id,name,slug').order('name');
     if (error) throw error;
     const select = $('adminScope');
-    for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); }
+    for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); const a=document.createElement('option'); a.value=t.id; a.textContent=t.name; $('assignOrganization').append(a); }
     select.addEventListener('change',()=>{ if(select.value!=='global') location.href='/tenant-admin/?tenant='+encodeURIComponent(select.value); });
   }
 

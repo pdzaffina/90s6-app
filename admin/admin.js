@@ -105,7 +105,18 @@
     $('bulkMsg').className = 'ap-msg' + (error ? ' err' : '');
   };
   $('bulkTemplate').addEventListener('click', () => {
-    const csv = 'email,full_name,password,role,active\r\n';
+    // Six valid role/status combinations. Replace or remove examples before upload.
+    // For existing accounts, password may be blank; only active status changes.
+    const csv = [
+      'email,full_name,password,role,active',
+      'example.user.active@example.com,Example User Active,TempPass2026!UserA,user,Y',
+      'example.user.inactive@example.com,Example User Inactive,TempPass2026!UserN,user,N',
+      'example.superuser.active@example.com,Example Superuser Active,TempPass2026!SuperA,superuser,Y',
+      'example.superuser.inactive@example.com,Example Superuser Inactive,TempPass2026!SuperN,superuser,N',
+      'example.admin.active@example.com,Example Admin Active,TempPass2026!AdminA,admin,Y',
+      'example.admin.inactive@example.com,Example Admin Inactive,TempPass2026!AdminN,admin,N',
+      'existing.account@example.com,Existing Account,,user,N'
+    ].join('\\r\\n') + '\\r\\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = el('a', { href: url, download: '90s6-bulk-users-template.csv' });
     document.body.append(a); a.click(); a.remove();

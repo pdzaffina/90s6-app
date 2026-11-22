@@ -67,7 +67,9 @@ Deno.serve(async(req)=>{
    const finish=String(choice?.finish_reason||"unknown");
    const usage=json?.usage||{};
    console.warn("NVIDIA returned no visible text",JSON.stringify({model,finish_reason:finish,prompt_tokens:usage.prompt_tokens??null,completion_tokens:usage.completion_tokens??null,reasoning_tokens:usage.completion_tokens_details?.reasoning_tokens??null,content_type:raw===null?"null":Array.isArray(raw)?"array":typeof raw}));
-   const tokenHint=finish==="length"?" The model exhausted its output token budget before producing visible text. Increase Maximum output tokens in Global Admin.":" Check that the selected model supports chat-completions text output.";
+   const reasoning=Number(usage.completion_tokens_details?.reasoning_tokens||0),total=Number(usage.completion_tokens||0);
+   const exhausted=finish==="length"&&total>0&&reasoning>=total;
+   const tokenHint=exhausted?" All completion tokens were consumed by reasoning ("+reasoning+"/"+total+"). Increase Maximum output tokens in Global Admin or choose a model with a smaller reasoning budget.":finish==="length"?" The model exhausted its output token budget before producing visible text. Increase Maximum output tokens in Global Admin.":" Check that the selected model supports chat-completions text output.";
    return respond({error:"NVIDIA returned no visible assessment (finish reason: "+finish+")."+tokenHint},502);
   }
   assessment=assessment.replace(/<[^>]*>/g,"").slice(0,1000);

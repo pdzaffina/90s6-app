@@ -5,6 +5,8 @@ if(!form)return;
 const say=(message,error=false)=>{status.textContent=message;status.className='ap-msg'+(error?' err':'');};
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data;};
 let allowed=false;
+const enabledToggle=$('globalAiEnabled');
+enabledToggle.onchange=async()=>{const desired=enabledToggle.checked;enabledToggle.disabled=true;try{await rpc('ainbox_ai_set_enabled',{p_enabled:desired});$('globalAiSwitchStatus').textContent=desired?'AI enabled':'AI disabled';}catch(e){enabledToggle.checked=!desired;say('Could not change AI state: '+e.message,true)}finally{enabledToggle.disabled=false}};
 const updateReasoning=()=>{const model=$('globalAiTestType').value==='alternate'?$('globalAiAlternateModel').value:$('globalAiModel').value;const supports=model.startsWith('openai/gpt-oss-');$('globalAiReasoning').disabled=!supports;if(!supports)$('globalAiReasoning').value='auto';};
 $('globalAiAlternateModel').onchange=updateReasoning;
 $('globalAiModel').onchange=updateReasoning;
@@ -69,6 +71,7 @@ $('globalAiRefreshModels').onclick=()=>refreshModels($('globalAiModel').value);
 async function load(){
  try{
   const settings=await rpc('ainbox_ai_get_settings');
+  const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
   await refreshModels(settings.model);
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);

@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); Object.assign(n, props); n.append(...kids); return n; };
-  let me = null;
+  let me = null; let organizationsByUser=new Map();
 
   const say = (t, err) => { const m = $('adminMsg'); m.textContent = t || ''; m.className = 'ap-msg' + (err ? ' err' : ''); };
 
@@ -27,7 +27,7 @@
     const { data, error } = await App.sb.from('tenants').select('id,name,slug').order('name');
     if (error) throw error;
     const select = $('adminScope');
-    for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); const a=document.createElement('option'); a.value=t.id; a.textContent=t.name; $('assignOrganization').append(a); }
+    for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); const g=document.createElement('option');g.value=t.id;g.textContent=t.name+' ('+t.slug+')';$('globalOrgFeatureTenant').append(g); const a=document.createElement('option'); a.value=t.id; a.textContent=t.name; $('assignOrganization').append(a); }
     select.addEventListener('change',()=>{ if(select.value!=='global') location.href='/tenant-admin/?tenant='+encodeURIComponent(select.value); });
   }
 
@@ -60,6 +60,7 @@
         el('td', { textContent: u.email || '' }),
         el('td', { textContent: u.full_name || '' }),
         el('td', {}, el('span', { className: 'ap-tag' + (u.is_admin ? '' : ' dim'), textContent: u.is_admin ? 'Admin' : u.is_superuser ? 'Superuser' : 'User' })),
+        el('td', { textContent: (organizationsByUser.get(u.id)||[]).join(', ') || 'None' }),
         el('td', {}, status),
         el('td', { textContent: u.owned + ' owned, ' + u.shared + ' shared' }),
         el('td', { textContent: fmt(u.last_seen_at) }),
@@ -69,7 +70,16 @@
 
   async function load() {
     say('Loading...');
-    try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));users.forEach(u=>u.is_content_creator=!!roleMap.get(u.id));render(users); say(users.length + ' users'); }
+    try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));
+      const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,status,tenants(name)').order('created_at');
+      if(membershipError)throw membershipError;
+      organizationsByUser=new Map();
+      for(const m of membershipData||[]){
+        const a=organizationsByUser.get(m.user_id)||[];
+        a.push((m.tenants?.name||'Unknown')+(m.status==='active'?'':' (inactive)'));
+        organizationsByUser.set(m.user_id,a);
+      }
+      users.forEach(u=>u.is_content_creator=!!roleMap.get(u.id));render(users); say(users.length + ' users'); }
     catch (e) { say(e.message, true); }
   }
 

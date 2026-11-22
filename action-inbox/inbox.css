@@ -58,3 +58,14 @@
 .ainbox-detail .ainbox-detail-actions .ainbox-action-quiet:hover:not(:disabled){background:#f2f5f8;color:#334d65}
 .ainbox-detail .ainbox-detail-actions .ainbox-action:focus-visible{outline:3px solid #83b8e0;outline-offset:2px}
 @media(max-width:420px){.ainbox-detail .ainbox-detail-actions{grid-template-columns:1fr}}
+
+/* Optional AI narrative, visually subordinate to authoritative scan assessment. */
+.ainbox .ainbox-ai{margin:14px 0 18px;padding:15px 17px;border:1px solid #cbdce9;border-radius:12px;background:linear-gradient(110deg,#f4f8fd,#fbfcfe)}
+.ainbox .ainbox-ai-heading{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+.ainbox .ainbox-ai-heading>span{font-size:13px;font-weight:800;color:#265c88}
+.ainbox .ainbox-ai-heading>span>span{font-size:17px;margin-right:5px}
+.ainbox .ainbox-ai-heading small{font-size:11px;color:#6c8194;font-weight:500;margin-left:7px}
+.ainbox .ainbox-ai-heading button{background:#245e92;color:#fff;border:1px solid #245e92;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:750;cursor:pointer}
+.ainbox .ainbox-ai-heading button:hover:not(:disabled){background:#194d7b}
+.ainbox .ainbox-ai-heading button:disabled{opacity:.6;cursor:wait}
+.ainbox .ainbox-ai p{font-size:13px;line-height:1.65;color:#36546c;margin:11px 0 0}

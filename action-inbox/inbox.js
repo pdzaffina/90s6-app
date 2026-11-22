@@ -87,6 +87,15 @@ function setTab(v){
  $('ainboxWorkspace').hidden=v==='rules';document.querySelector('.ainbox-filters').hidden=v==='rules';$('ainboxRules').hidden=v!=='rules';$('ainboxScan').hidden=v!=='rules'||!allowedAdmin();
  if(v==='rules')loadRules();else load();
 }
+function timezoneChoices(current){
+ const common=['UTC','America/New_York','America/Chicago','America/Denver','America/Phoenix','America/Los_Angeles','America/Anchorage','Pacific/Honolulu'];
+ const supported=typeof Intl.supportedValuesOf==='function'?Intl.supportedValuesOf('timeZone'):[];
+ const all=[...new Set([...common,...supported,current].filter(Boolean))];
+ const valid=all.filter(zone=>{try{new Intl.DateTimeFormat('en-US',{timeZone:zone});return true}catch{return false}});
+ const label=zone=>zone==='UTC'?'UTC (Coordinated Universal Time)':zone.replaceAll('_',' ').replaceAll('/',' / ');
+ const group=(zones,title)=>'<optgroup label="'+esc(title)+'">'+zones.map(zone=>'<option value="'+esc(zone)+'">'+esc(label(zone))+'</option>').join('')+'</optgroup>';
+ return group(common.filter(zone=>valid.includes(zone)),'Common time zones')+group(valid.filter(zone=>!common.includes(zone)).sort((a,b)=>a.localeCompare(b)),'All time zones');
+}
 function openRuleEditor(rule){
  if(!rule)return;
  const panel=$('ainboxRuleEditor');
@@ -94,7 +103,7 @@ function openRuleEditor(rule){
  const extra=rule.evaluator_type==='KB-002'
   ?'<label>Maximum draft age (days)<input name="threshold" type="number" min="1" max="3650" required></label>'
   :rule.evaluator_type==='WORK-001'
-  ?'<label>Organization timezone<input name="timezone" type="text" maxlength="100" required placeholder="America/Chicago"></label>'
+  ?'<label>Organization timezone<select name="timezone" required>'+timezoneChoices(cfg.timezone||'UTC')+'</select><small>Choose an IANA time zone. Daylight saving changes are handled automatically.</small></label>'
   :'<label>Active initiative statuses<input name="statuses" type="text" required placeholder="active, in progress"><small>Separate statuses with commas.</small></label>';
  panel.hidden=false;
  panel.innerHTML='<div class="ainbox-rule-editor-heading"><div><small>RULE CONFIGURATION</small><h3>'+esc(rule.rule_key)+' · '+esc(rule.name)+'</h3><p>Update settings and publish a new rule version.</p></div><button type="button" class="ainbox-rule-close" id="ainboxRuleClose" aria-label="Close rule editor">×</button></div><form id="ainboxRuleForm"><label class="ainbox-rule-toggle"><input type="checkbox" name="enabled"><span>Rule enabled<small>Disabled rules cannot be scanned.</small></span></label><div class="ainbox-rule-fields"><label>Evaluation interval (minutes)<input name="interval" type="number" min="15" max="525600" step="1" required><small>Minimum 15 minutes.</small></label>'+extra+'</div><p class="ainbox-rule-error" id="ainboxRuleError" role="alert" hidden></p><div class="ainbox-rule-actions"><button type="button" id="ainboxRuleCancel">Cancel</button><button type="submit" class="ainbox-rule-save" id="ainboxRuleSave">Save changes</button></div></form>';
@@ -117,7 +126,7 @@ function openRuleEditor(rule){
    if(!Number.isInteger(days)||days<1||days>3650){error.textContent='Draft age must be between 1 and 3,650 days.';error.hidden=false;return}
    next.threshold_days=days;
   }else if(rule.evaluator_type==='WORK-001'){
-   const zone=form.elements.timezone.value.trim();
+   const zone=form.elements.timezone.value;
    try{new Intl.DateTimeFormat('en-US',{timeZone:zone})}catch{error.textContent='Enter a valid IANA timezone, such as America/Chicago.';error.hidden=false;return}
    next.timezone=zone;
   }else{

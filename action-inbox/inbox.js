@@ -1,6 +1,25 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id),sb=App.sb;
-let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[],assessmentItems=[],scanCoverage=[],assessmentFull=false,aiScope='',aiRequest=0;
+let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[],assessmentItems=[],scanCoverage=[],assessmentFull=false,aiScope='',aiRequest=0,aiUserId=null,aiCache=null;
+const AI_FRESH_MS=24*60*60*1000;
+const aiScopeDb=()=>tab+':'+($('ainboxWorkstream').value||'all');
+function displayCachedAI(entry){
+ if(!entry||!entry.assessment)return;
+ aiCache=entry;
+ $('ainboxAIText').textContent=entry.assessment;
+ $('ainboxAiBadge').hidden=false;
+ $('ainboxAiDisclaimer').hidden=false;
+ const stale=Date.now()-new Date(entry.generated_at).getTime()>=AI_FRESH_MS;
+ $('ainboxAiBadge').classList.toggle('is-stale',stale);
+ $('ainboxAiStale').hidden=!stale;
+}
+async function restoreAI(scope,request){
+ if(!aiUserId||!tenant)return;
+ const {data,error}=await sb.from('ainbox_ai_assessment_cache').select('assessment,model,generated_at').eq('user_id',aiUserId).eq('tenant_id',tenant).eq('scope_key',aiScopeDb()).maybeSingle();
+ if(error){console.warn('Could not restore AI assessment',error.message);return;}
+ if(scope===aiScope&&request===aiRequest&&data)displayCachedAI(data);
+}
+
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const msg=(message,type='info')=>{const el=$('ainboxMessage');if(!el)return;el.textContent=message||'';el.hidden=!message;el.className='ainbox-message ainbox-message--'+(message?type:'info');el.setAttribute('role',type==='error'?'alert':'status');};
 const date=s=>s?new Date(s).toLocaleString():'Not yet';
@@ -49,7 +68,7 @@ function render(){
  $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
  $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
  const scopeKey=tenant+':'+tab+':'+(w?.id||'all');
- if(aiScope!==scopeKey){aiScope=scopeKey;aiRequest++;$('ainboxAiBadge').hidden=true;$('ainboxAiDisclaimer').hidden=true;$('ainboxAIText').textContent='Generate an AI interpretation of your accessible exceptions. The deterministic assessment above remains authoritative.';}
+ if(aiScope!==scopeKey){aiScope=scopeKey;aiRequest++;aiCache=null;$('ainboxAiBadge').hidden=true;$('ainboxAiStale').hidden=true;$('ainboxAiDisclaimer').hidden=true;$('ainboxAIText').textContent='Generate an AI interpretation of your accessible exceptions. The deterministic assessment above remains authoritative.';restoreAI(aiScope,aiRequest);}else if(aiCache){const stale=Date.now()-new Date(aiCache.generated_at).getTime()>=AI_FRESH_MS;$('ainboxAiBadge').classList.toggle('is-stale',stale);$('ainboxAiStale').hidden=!stale;}
  const assessment=workstreamAssessment(w?.id||null);
  $('ainboxHealth').textContent=assessment.health;
  $('ainboxAssessment').textContent=assessment.text;
@@ -181,19 +200,21 @@ $('ainboxGenerateAI').onclick=async()=>{
  const button=$('ainboxGenerateAI'),output=$('ainboxAIText');
  const scope=aiScope,request=++aiRequest;
  button.disabled=true;button.textContent='Generating…';
- output.textContent='Reviewing your accessible exception summary…';$('ainboxAiBadge').hidden=true;$('ainboxAiDisclaimer').hidden=true;
+ output.textContent='Reviewing your accessible exception summary…';$('ainboxAiBadge').hidden=true;$('ainboxAiStale').hidden=true;$('ainboxAiDisclaimer').hidden=true;
  try{
   const {data,error}=await sb.functions.invoke('ainbox-ai-assessment',{body:{tenant_id:tenant,workstream_id:$('ainboxWorkstream').value||null}});
   if(error){let detail=data?.error;try{const response=error.context;if(response&&typeof response.json==='function'){const body=await response.json();detail=body?.error||detail;}}catch{}throw Error(detail||error.message||'AI provider unavailable');}
   if(data?.error)throw Error(data.error);
   if(scope!==aiScope||request!==aiRequest)return;
   if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');
-  output.textContent=data.assessment;
-  $('ainboxAiBadge').hidden=false;$('ainboxAiDisclaimer').hidden=false;
+  const record={user_id:aiUserId,tenant_id:tenant,scope_key:aiScopeDb(),assessment:data.assessment,model:data.model||null,generated_at:data.generated_at||new Date().toISOString()};
+  displayCachedAI(record);
+  const {error:saveError}=await sb.from('ainbox_ai_assessment_cache').upsert(record,{onConflict:'user_id,tenant_id,scope_key'});
+  if(saveError)msg('Assessment generated, but could not be saved for later: '+saveError.message,'warning');
  }catch(e){if(scope===aiScope&&request===aiRequest)output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}
  finally{button.disabled=false;button.textContent='Generate assessment';}
 };
 $('ainboxScan').onclick=loadRules;
-App.onSession(async(s,p)=>{if(!s)return;user=p;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.','warning');return}
+App.onSession(async(s,p)=>{if(!s)return;user=p;aiUserId=s.user.id;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.','warning');return}
  document.querySelector('[data-tab="all"]').hidden=!allowedAdmin();document.querySelector('[data-tab="rules"]').hidden=!allowedAdmin();await load()});
 })();

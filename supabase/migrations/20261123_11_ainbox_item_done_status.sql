@@ -26,7 +26,7 @@ begin
          continue;
        end if;
        begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;
-       if item->>'status' is null or item->>'status' not in ('To Do','In Progress','Done') then unknowns:=unknowns+1;continue;end if;
+       if item->>'status' is not null and item->>'status' not in ('To Do','In Progress','Done') then unknowns:=unknowns+1;continue;end if;
        complete:=item->>'status'='Done';
        outcome:=case when not complete and due_date<today_local then 'Violation' else 'Compliant' end;
        total:=total+1;if outcome='Violation' then violations:=violations+1;end if;

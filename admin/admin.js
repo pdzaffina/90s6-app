@@ -73,6 +73,21 @@
     catch (e) { say(e.message, true); }
   }
 
+  $('assignUsersOrg').onclick=async()=>{
+    const ids=Array.from(document.querySelectorAll('.feature-user-check:checked'),x=>x.value);
+    const tenant=$('assignOrganization').value,role=$('assignRole').value;
+    const msg=$('assignUsersMsg');
+    if(!tenant||!ids.length){msg.textContent='Select users and an organization.';return;}
+    if(!confirm('Assign '+ids.length+' users to this organization?'))return;
+    $('assignUsersOrg').disabled=true;
+    try{
+      const {data,error}=await App.sb.rpc('global_assign_tenant_members',{p_tenant:tenant,p_users:ids,p_role:role});
+      if(error)throw error;
+      msg.textContent=data+' users assigned.';
+      await load();
+    }catch(e){msg.textContent=e.message;}
+    finally{$('assignUsersOrg').disabled=false;}
+  };
   $('inviteForm').addEventListener('submit', async e => {
     e.preventDefault();
     const email = $('inviteEmail').value.trim();

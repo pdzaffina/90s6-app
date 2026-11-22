@@ -35,3 +35,11 @@
 .ainbox-rules .ainbox-rule-buttons button span{font-size:13px;line-height:1}
 
 .ainbox-rule-fields select{width:100%;min-width:0;padding:11px 12px;border:1px solid #cddbe8;border-radius:9px;background:#fff;color:#172c43;font-size:14px;cursor:pointer}.ainbox-rule-fields select:focus-visible{outline:2px solid #6aa2cf;outline-offset:1px}
+
+/* Semantic Action Inbox feedback: successful operations are not errors. */
+.ainbox .ainbox-message{display:flex;align-items:center;min-height:42px;margin:14px 0 18px;padding:11px 15px;border-radius:10px;border:1px solid transparent;font-size:13px;font-weight:650;line-height:1.5}
+.ainbox .ainbox-message[hidden]{display:none!important}
+.ainbox .ainbox-message--success{background:#eaf7ef;border-color:#b9dfc7;color:#216342}
+.ainbox .ainbox-message--error{background:#fff0ed;border-color:#e9bdb3;color:#a33c29}
+.ainbox .ainbox-message--warning{background:#fff8e9;border-color:#ead4a4;color:#805c1d}
+.ainbox .ainbox-message--info{background:#edf5fc;border-color:#c9deef;color:#245b85}

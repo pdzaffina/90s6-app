@@ -55,7 +55,7 @@
   const nav = el('header', { id: 'appNav', hidden: true });
   nav.innerHTML = `
     <div class="ap-nav-top">
-      <a class="brand" href="/" aria-label="90S6 home">90S6<span class="ap-brand-accent"> App</span></a>
+      <a class="brand ap-wordmark" href="/" aria-label="90s6 home"><span>90</span><span class="ap-logo-s">s</span><span>6</span></a>
       <div class="ap-nav-account">
         <div class="ap-org-control"><span class="ap-org-label">ORGANIZATION</span><span class="ap-org-icon" aria-hidden="true">▦</span><select id="apTenantSelect" aria-label="Active organization"></select><span id="apTenantName" class="ap-tenant-name" hidden></span><span id="apOrgChevron" class="ap-org-chevron" aria-hidden="true">⌄</span></div>
         <div class="ap-user-menu"><button type="button" id="apUserButton" aria-expanded="false" aria-controls="apUserDropdown" aria-label="Account menu"><span id="apAvatar" class="ap-avatar">U</span><span class="who" id="apWho"></span><span class="ap-user-chevron" aria-hidden="true">⌄</span></button>

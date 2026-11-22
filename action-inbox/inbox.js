@@ -164,6 +164,8 @@ async function renderDetail(x){
   try{
    const {data:enabled,error:enabledError}=await sb.rpc('ainbox_ai_component_enabled',{p_key:'communication'});
    aiBar.hidden=!!enabledError||enabled!==true;
+   const {data:escalationEnabled}=await sb.rpc('ainbox_ai_component_enabled',{p_key:'escalation'});
+   $('ainboxAiCommType').querySelector('[value="escalation"]').hidden=escalationEnabled!==true;
   }catch{aiBar.hidden=true}
   $('ainboxGenerateComm').onclick=async()=>{
    const button=$('ainboxGenerateComm'),status=$('ainboxAiCommStatus');

@@ -53,7 +53,12 @@ Deno.serve(async(req)=>{
     {role:"user",content:JSON.stringify(facts)}
    ]})
   });
-  if(!result.ok)return respond({error:"AI provider request failed ("+result.status+"). The deterministic assessment is still available."},502);
+  if(!result.ok){
+   let reason="";
+   try{const payload=await result.json();reason=String(payload?.error?.message||payload?.detail||"").slice(0,240).replace(/[\\r\\n]/g," ");}catch{}
+   console.error("NVIDIA inference failed",JSON.stringify({status:result.status,model,reason}));
+   return respond({error:"NVIDIA returned HTTP "+result.status+(reason?": "+reason:"")+". Check the selected model and provider credentials."},502);
+  }
   const json=await result.json();
   let assessment=String(json?.choices?.[0]?.message?.content||"").trim();
   assessment=assessment.replace(/<[^>]*>/g,"").slice(0,1000);

@@ -10,7 +10,7 @@ create table if not exists public.tenants (
 create table if not exists public.tenant_members (
  tenant_id uuid not null references public.tenants(id) on delete cascade,
  user_id uuid not null references public.profiles(id) on delete cascade,
- role text not null check (role in ('organization_admin','superuser','user')),
+ role text not null check (role in ('tenant_admin','superuser','user')),
  status text not null default 'active' check (status in ('active','inactive')),
  created_at timestamptz not null default now(),
  primary key (tenant_id,user_id)

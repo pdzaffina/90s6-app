@@ -78,3 +78,8 @@
 .ainbox .ainbox-ai-heading .ai-assisted-glyph{width:11px;height:11px;flex:none;display:inline-block}
 .ainbox .ainbox-ai-disclaimer{margin:-9px 0 13px 2px;font-size:11px;line-height:1.4;color:var(--muted,#68788c)}
 .ainbox .ainbox-ai-disclaimer[hidden]{display:none!important}
+
+.ainbox .ai-assisted-pill.is-stale{background:#edf0f4;border-color:#cbd2da;color:#697582}
+.ainbox .ainbox-ai-stale[hidden]{display:none!important}
+.ainbox .ainbox-ai-stale{display:inline-flex;align-items:center;gap:3px}
+.ainbox .ainbox-ai-dot{font-weight:900;font-size:13px;line-height:0}

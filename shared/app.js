@@ -37,6 +37,7 @@
       </form>
       <p id="apMsg" role="status"></p>
     </div>`;
+  gate.classList.add('ap-pending');
   document.body.append(gate);
 
   const msg = (t, err) => { const m = $('apMsg'); m.textContent = t || ''; m.className = err ? 'err' : ''; };
@@ -101,12 +102,12 @@
     if (!s) {
       const signedOutUserId = session?.user?.id;
       session = null; profile = null; tenantMemberships=[]; activeTenantId=null; state = 'out';
-      gate.hidden = false; $('apForm').hidden = false; msg(notice, !!notice); notice = '';
+      gate.classList.remove('ap-pending'); gate.hidden = false; $('apForm').hidden = false; msg(notice, !!notice); notice = '';
       renderNav(); emit(); return;
     }
     if (session && session.user.id === s.user.id) { session = s; return; } // token refresh
     session = s;
-    $('apForm').hidden = true; gate.hidden = false; msg('Loading your account...');
+    $('apForm').hidden = true; gate.classList.add('ap-pending'); gate.hidden = false; msg('');
     const { data, error } = await sb.from('profiles')
       .select('id,email,full_name,is_admin,is_superuser,is_content_creator,disabled,tour_completed_at,intro_presentation_completed_at').eq('id', s.user.id).maybeSingle();
     if (error || !data || data.disabled) {
@@ -139,7 +140,7 @@
         sb.rpc('log_event', { p_action: 'auth.sign_in' }).then(() => {});
       }
     } catch (e) {}
-    gate.hidden = true; renderNav(); emit();
+    gate.hidden = true; gate.classList.remove('ap-pending'); renderNav(); emit();
   }
 
   // Defer out of the callback: awaiting supabase calls inside it can deadlock

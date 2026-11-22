@@ -130,6 +130,19 @@ Deno.serve(async (req) => {
       }
       return json({ results });
     }
+    case 'reset_onboarding': {
+      if (!id) return json({ error: 'User ID required.' }, 400);
+      const kind = String(b.kind ?? '');
+      if (kind !== 'tour' && kind !== 'intro') return json({ error: 'Invalid onboarding type.' }, 400);
+      const column = kind === 'tour' ? 'tour_completed_at' : 'intro_presentation_completed_at';
+      const { data: target, error: lookupError } = await db.from('profiles').select('id,email').eq('id', id).maybeSingle();
+      if (lookupError) return fail(lookupError);
+      if (!target) return json({ error: 'User not found.' }, 404);
+      const { error } = await db.from('profiles').update({ [column]: null }).eq('id', id);
+      if (error) return fail(error);
+      await log('admin.reset_onboarding', target.email ?? id, { kind });
+      return json({ ok: true });
+    }
     case 'set_admin': {
       const bad = needOther(); if (bad) return bad;
       const { error } = await db.from('profiles').update({ is_admin: b.is_admin === true }).eq('id', id);

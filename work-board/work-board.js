@@ -86,6 +86,14 @@
   const badge = el('span', { id: 'boardBadge' });
   const newBoardBtn = el('button', { type: 'button', textContent: '+ Board' });
   const manageBtn = el('button', { type: 'button', textContent: 'Share / manage' });
+  const templateStyle = el('style', { textContent: `
+    .wcTemplateGrid:not([hidden]){display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-top:12px}
+    .wcTemplateCard{display:flex;flex-direction:column;align-items:flex-start;gap:7px;padding:14px;border:1px solid #d6dfe5;border-radius:12px;background:var(--paper,#fff)}
+    .wcTemplateCard strong{font-size:14px}.wcTemplateCard small{color:#647380}.wcTemplateCard p{font-size:12px;margin:0;line-height:1.45}
+    .wcTemplateCard button{margin-top:auto}
+    #wcLayout{width:min(760px,calc(100vw - 28px));max-height:90vh;overflow:auto}
+  ` });
+  document.head.append(templateStyle);
   const layoutBtn = el('button', { type: 'button', textContent: 'Layout' });
   const bar = [sel, badge, newBoardBtn, manageBtn, layoutBtn];
   document.querySelector('.toolbar').prepend(...bar);
@@ -313,6 +321,7 @@
     <div class="wcBody">
       <div class="field"><label>Columns</label><div id="wcCols" class="wcList"></div><button type="button" class="ghost" id="wcAddCol">+ Add column</button></div>
       <div class="field"><label>Swimlanes</label><div id="wcLanes" class="wcList"></div><button type="button" class="ghost" id="wcAddLane">+ Add swimlane</button></div>
+      <div class="field"><label>Template library</label><p class="wcMuted">Start from a ready-made board layout, then customize it before saving.</p><button type="button" class="ghost" id="wcOpenTemplates">Browse templates</button><div id="wcTemplateLibrary" hidden></div></div>
       <div class="actions"><button type="button" class="ghost" id="wcLayoutExport">Export layout (.json)</button><button type="button" class="ghost" id="wcLayoutImport">Import layout (.json)</button><input id="wcLayoutFile" type="file" accept=".json,application/json" hidden></div><p class="wcMuted">Layout files contain columns, swimlanes, and descriptions only. Work items are not exported.</p><p id="wcLayoutMsg" class="wcMuted"></p>
       <div class="actions"><button type="button" id="wcLayoutCancel">Cancel</button><button type="button" class="primary" id="wcLayoutSave">Save layout</button></div>
     </div>`;
@@ -354,6 +363,47 @@
   };
   $('wcAddCol').addEventListener('click', () => addRow('cols', 'columns'));
   $('wcAddLane').addEventListener('click', () => addRow('lanes', 'swimlanes'));
+  // Built-in layout templates modify only the editable draft, never work items.
+  const layoutTemplates = [
+    { name: 'Now / Next / Later', subtitle: 'Have to vs. Want to', description: 'A simple priority board that separates commitments from discretionary work.',
+      columns: [['Now', 'Current priorities'], ['Next', 'Up next'], ['Later', 'Not yet scheduled']],
+      lanes: [['Have to', 'Required commitments'], ['Want to', 'Opportunities and improvements']] },
+    { name: 'Two-week sprint', subtitle: 'Three worker swimlanes', description: 'A 14-day sprint with three assignable worker lanes.',
+      columns: [['Backlog', 'Not committed to this sprint'], ['Week 1', 'First week of the sprint'], ['Week 2', 'Second week of the sprint'], ['Done', 'Completed work']],
+      lanes: [['Worker 1', 'Rename to team member'], ['Worker 2', 'Rename to team member'], ['Worker 3', 'Rename to team member']] },
+    { name: 'Ideas pipeline', subtitle: 'From spark to execution', description: 'Capture, evaluate, validate and advance promising ideas.',
+      columns: [['Inbox', 'New ideas'], ['Explore', 'Research and shape'], ['Validate', 'Test feasibility and value'], ['Approved', 'Ready to pursue'], ['Launched', 'Put into action']],
+      lanes: [['Ideas', 'Opportunities and concepts']] },
+    { name: 'Simple Kanban', subtitle: 'Maybe / Todo / Doing / Done', description: 'A lightweight workflow to track work from possibility through completion.',
+      columns: [['Maybe', 'Possible work'], ['Todo', 'Committed work'], ['Doing', 'In progress'], ['Done', 'Completed']],
+      lanes: [['Work', 'All work items']] }
+  ];
+  const templateLibrary = $('wcTemplateLibrary');
+  $('wcOpenTemplates').addEventListener('click', () => {
+    templateLibrary.hidden = !templateLibrary.hidden;
+    $('wcOpenTemplates').textContent = templateLibrary.hidden ? 'Browse templates' : 'Hide templates';
+  });
+  templateLibrary.className = 'wcTemplateGrid';
+  layoutTemplates.forEach(template => {
+    const choose = el('button', { type: 'button', className: 'ghost', textContent: 'Use template' });
+    choose.addEventListener('click', () => {
+      const existing = board.getLayout();
+      const toDraft = (rows, prior) => rows.map(([name, hint]) => ({
+        name, hint, orig: prior.find(p => p.name.toLowerCase() === name.toLowerCase())?.name || null
+      }));
+      draft = { cols: toDraft(template.columns, existing.columns), lanes: toDraft(template.lanes, existing.lanes) };
+      drawLayout('cols'); drawLayout('lanes');
+      layoutMsg('Template loaded for review. Rename or reorder fields as needed, then select Save layout. Existing tasks in unmatched categories will move to the first column or swimlane.');
+      templateLibrary.hidden = true;
+      $('wcOpenTemplates').textContent = 'Browse templates';
+    });
+    const preview = el('div', { className: 'wcMuted', textContent: template.columns.map(c => c[0]).join('  ·  ') + ' | ' + template.lanes.map(l => l[0]).join('  ·  ') });
+    const card = el('div', { className: 'wcTemplateCard' },
+      el('strong', { textContent: template.name }),
+      el('small', { textContent: template.subtitle }),
+      el('p', { textContent: template.description }), preview, choose);
+    templateLibrary.append(card);
+  });
   // Layout templates are portable across boards and organizations; never include work items.
   $('wcLayoutExport').addEventListener('click', () => {
     if (!canManage || !current || current.role === 'viewer') return;

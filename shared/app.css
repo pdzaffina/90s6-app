@@ -121,7 +121,7 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 
 /* Brand wordmark: light gray 90 and 6, electric-blue lowercase s, on dark. */
 #appNav .ap-wordmark{display:inline-flex;align-items:baseline;gap:0;background:transparent;color:#c4cbd5;padding:4px 12px 6px;border-radius:8px;font-family:var(--ap-font);font-size:34px;font-weight:900;line-height:1;letter-spacing:-2.6px;text-decoration:none}
-#appNav .ap-wordmark .ap-logo-s{color:#4c6bf0}
+#appNav .ap-wordmark .ap-logo-s{color:var(--ap-blue)}
 @media(max-width:520px){#appNav .ap-wordmark{font-size:29px;padding:5px 9px;letter-spacing:-2.2px}}
 
 /* Quiet navigation: protect content while authentication resolves without flashing a login dialog. */

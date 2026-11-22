@@ -62,10 +62,27 @@ function exportWbsExcel(){
 }
 $('exportWbsBtn').addEventListener('click',exportWbsExcel);
 let wbsEditing=false;
-function renderWbs(){const query=$('searchInput').value.trim().toLowerCase();const filtering=!!query;const byId=new Map(data.map(x=>[x.id,x]));const hit=x=>(!query||[x.title,x.description,x.owner].join(' ').toLowerCase().includes(query));let keep=null;if(filtering){keep=new Set();for(const x of data)if(hit(x)){let p=x;while(p&&!keep.has(p.id)){keep.add(p.id);p=byId.get(p.parent)}}}
+const wbsFilters={owner:'',when:'',kind:'',effort:'',due:''};
+function renderWbs(){const query=$('searchInput').value.trim().toLowerCase();const filtering=!!query||Object.values(wbsFilters).some(Boolean);const byId=new Map(data.map(x=>[x.id,x]));const hit=x=>(!query||[x.title,x.description,x.owner].join(' ').toLowerCase().includes(query))&&(!wbsFilters.owner||x.owner===wbsFilters.owner)&&(!wbsFilters.when||x.when===wbsFilters.when)&&(!wbsFilters.kind||x.kind===wbsFilters.kind)&&(!wbsFilters.effort||x.effort===wbsFilters.effort)&&(!wbsFilters.due||x.due===wbsFilters.due);let keep=null;if(filtering){keep=new Set();for(const x of data)if(hit(x)){let p=x;while(p&&!keep.has(p.id)){keep.add(p.id);p=byId.get(p.parent)}}}
 const rows=flatten(kidsOf(),keep,x=>filtering||!collapsed.has(x.id));const wrap=$('wbs');wrap.replaceChildren();
 const top=node('div','wbsTop');const left=node('div','wbsAct wbs-edit');const addTop=node('button','primary','+ Add top-level task');addTop.type='button';addTop.addEventListener('click',()=>openEditor());left.append(addTop);const toggle=node('button',wbsEditing?'primary':'',''+(wbsEditing?'Done editing':'Edit WBS'));toggle.type='button';toggle.addEventListener('click',()=>{wbsEditing=!wbsEditing;render()});left.append(toggle);
 const right=node('div','wbsAct');const ex=node('button','','Expand all');ex.type='button';ex.addEventListener('click',()=>{collapsed.clear();render()});const co=node('button','','Collapse all');co.type='button';co.addEventListener('click',()=>{data.forEach(x=>{if(data.some(a=>a.parent===x.id))collapsed.add(x.id)});render()});right.append(ex,co);top.append(left,right);wrap.append(top);
+const filterBar=node('div','wbsFilters');
+const choices=[
+ ['owner','Owner',[...new Set(data.map(x=>x.owner).filter(Boolean))].sort()],
+ ['when','Column',WHEN],['kind','Swimlane',KIND],['effort','Size',['Small','Medium','Large']]
+];
+for(const [key,label,values] of choices){
+ const group=node('label','',label);const select=node('select');
+ select.append(new Option('All '+label.toLowerCase()+'s',''));
+ values.forEach(v=>select.append(new Option(v,v)));
+ select.value=wbsFilters[key];
+ select.addEventListener('change',()=>{wbsFilters[key]=select.value;render()});
+ group.append(select);filterBar.append(group);
+}
+const dueLabel=node('label','','Due date');const dueInput=node('input');dueInput.type='date';dueInput.value=wbsFilters.due;dueInput.addEventListener('change',()=>{wbsFilters.due=dueInput.value;render()});dueLabel.append(dueInput);filterBar.append(dueLabel);
+const clear=node('button','','Clear filters');clear.type='button';clear.addEventListener('click',()=>{Object.keys(wbsFilters).forEach(k=>wbsFilters[k]='');render()});filterBar.append(clear);
+wrap.append(filterBar);
 const table=node('table');const head=node('tr');['WBS','Task','Owner','Column','Swimlane','Size','Due','Files',''].forEach(t=>head.append(node('th','',t)));const thead=node('thead');thead.append(head);const tbody=node('tbody');
 for(const r of rows){const x=r.x;const tr=node('tr');tr.append(node('td','wbsNum',r.num));
 const tt=node('td');const w=node('div','wbsTask');w.style.paddingLeft=(r.depth*22)+'px';

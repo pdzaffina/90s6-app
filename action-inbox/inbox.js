@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id),sb=App.sb;
-let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[];
+let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[],assessmentItems=[],scanCoverage=[],assessmentFull=false;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const msg=(message,type='info')=>{const el=$('ainboxMessage');if(!el)return;el.textContent=message||'';el.hidden=!message;el.className='ainbox-message ainbox-message--'+(message?type:'info');el.setAttribute('role',type==='error'?'alert':'status');};
 const date=s=>s?new Date(s).toLocaleString():'Not yet';
@@ -10,12 +10,12 @@ async function load(){
  if(!tenant)return;
  msg('Loading Action Inbox…');
  try{
-  const [w,a]=await Promise.all([rpc('ainbox_get_workstreams',{p_tenant:tenant}),rpc('ainbox_get_actions',{p_tenant:tenant,p_all:tab==='all'})]);
-  workstreams=Array.isArray(w)?w:[];items=Array.isArray(a)?a:[];
+  const [w,a,c,all]=await Promise.all([rpc('ainbox_get_workstreams',{p_tenant:tenant}),rpc('ainbox_get_actions',{p_tenant:tenant,p_all:tab==='all'}),allowedAdmin()?rpc('ainbox_get_scan_coverage',{p_tenant:tenant}):Promise.resolve([]),allowedAdmin()&&tab!=='all'?rpc('ainbox_get_actions',{p_tenant:tenant,p_all:true}):Promise.resolve(null)]);
+  workstreams=Array.isArray(w)?w:[];items=Array.isArray(a)?a:[];scanCoverage=Array.isArray(c)?c:[];assessmentFull=allowedAdmin();assessmentItems=assessmentFull?(Array.isArray(all)?all:items):items;
   const sel=$('ainboxWorkstream'),old=sel.value;sel.replaceChildren(new Option('All workstreams',''),...workstreams.map(x=>new Option(x.name,x.id)));sel.value=workstreams.some(x=>x.id===old)?old:'';
   // Selection is reconciled against the visible filtered list in render().
   msg('');render();
- }catch(e){msg('Could not load Action Inbox: '+e.message,'error');items=[];render()}
+ }catch(e){msg('Could not load Action Inbox: '+e.message,'error');items=[];assessmentItems=[];scanCoverage=[];assessmentFull=false;render()}
 }
 function filtered(){
  const w=$('ainboxWorkstream').value,st=$('ainboxStatus').value,q=$('ainboxSearch').value.trim().toLowerCase();
@@ -24,12 +24,33 @@ function filtered(){
  (!q||[x.title,x.rule_name,x.summary,x.workstream].join(' ').toLowerCase().includes(q)))
  .sort((a,b)=>Number(b.priority_score)-Number(a.priority_score)||new Date(a.first_detected_at)-new Date(b.first_detected_at));
 }
+function workstreamAssessment(workstreamId){
+ const relevant=assessmentItems.filter(x=>(!workstreamId||x.workstream_id===workstreamId)&&!x.resolved_at&&x.status!=='resolved');
+ const high=relevant.filter(x=>Number(x.priority_score)>=70);
+ const outstanding=relevant.filter(x=>x.status!=='dismissed');
+ const scans=scanCoverage.filter(x=>(!workstreamId||x.workstream_id===workstreamId)&&x.enabled);
+ const now=Date.now();
+ const incomplete=!assessmentFull||!scans.length||scans.some(x=>x.scan_status!=='succeeded'||!x.scanned_at||Number(x.unknown)>0||Number(x.evaluated)===0||now-new Date(x.scanned_at).getTime()>Math.max(15,Number(x.interval_minutes)||360)*120000);
+ const latest=scans.map(x=>new Date(x.scanned_at).getTime()).filter(Number.isFinite);
+ const latestAt=latest.length?new Date(Math.min(...latest)).toLocaleString():'Not available';
+ let health='Insufficient Data';
+ if(high.length)health='Off Track';
+ else if(outstanding.length)health='At Risk';
+ else if(!incomplete)health='On Track';
+ const scope=assessmentFull?'all source-accessible exceptions':'your assigned, accessible exceptions';
+ const first=health==='Off Track'?high.length+' high-priority unresolved exception'+(high.length===1?' requires':'s require')+' immediate attention.':health==='At Risk'?outstanding.length+' unresolved exception'+(outstanding.length===1?' needs':'s need')+' follow-up.':health==='On Track'?'No unresolved exceptions were found in the current assessed scope.':'There is not enough verified scan coverage to establish a reliable health assessment.';
+ const second=assessmentFull?'Assessment covers '+scope+' across '+scans.length+' enabled rule'+(scans.length===1?'':'s')+'.':'Assessment covers only '+scope+', not the entire workstream.';
+ const third=incomplete?'Scan coverage is incomplete, stale, or includes Unknown records; last coverage checkpoint: '+latestAt+'.':'Latest required scan checkpoint: '+latestAt+'.';
+ return {health,text:[first,second,third].join(' ')};
+}
 function render(){
  const list=filtered(),w=workstreams.find(x=>x.id===$('ainboxWorkstream').value);
  if(!list.some(x=>x.id===selected)){selected=list[0]?.id||null;detailTab='remediation';}
  $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
  $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
- $('ainboxHealth').textContent=w?.health_status||'Insufficient Data';
+ const assessment=workstreamAssessment(w?.id||null);
+ $('ainboxHealth').textContent=assessment.health;
+ $('ainboxAssessment').textContent=assessment.text;
  $('ainboxCount').textContent=list.length;$('ainboxHigh').textContent=list.filter(x=>Number(x.priority_score)>=70).length;
  $('ainboxProgress').textContent=list.filter(x=>x.status==='in_progress').length;$('ainboxListCount').textContent=list.length+' results';
  $('ainboxList').innerHTML=list.length?list.map(x=>`<button type="button" class="ainbox-item" data-id="${esc(x.id)}" aria-pressed="${x.id===selected}"><span class="top"><small>${esc(x.workstream)} · ${esc(x.rule_key)}</small><span class="ainbox-pill">${esc(x.status.replaceAll('_',' '))}</span></span><strong>${esc(x.title||x.rule_name)}</strong><p>${esc(x.summary||'A business rule requires attention.')}</p><small>Priority ${esc(x.priority_score)} · Detected ${esc(date(x.first_detected_at))}</small></button>`).join(''):'<div class="ainbox-empty">No exceptions match your filters. Check the last completed scan or adjust your filters.</div>';

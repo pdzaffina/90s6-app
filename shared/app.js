@@ -68,7 +68,7 @@
   function renderNav() {
     nav.hidden = state !== 'in';
     if (state !== 'in') return;
-    $('apAdminLink').hidden = !(profile.is_admin || isTenantAdmin());
+    $('apAdminLink').hidden = !profile.is_admin; // Tenant Admin UI pending authorization-aware implementation.
     const tenantSelect = $('apTenantSelect');
     tenantSelect.replaceChildren();
     for (const m of tenantMemberships) { const o = document.createElement('option'); o.value=m.tenant_id; o.textContent=m.tenants?.name || m.tenant_id; tenantSelect.append(o); }

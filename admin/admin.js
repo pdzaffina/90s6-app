@@ -149,7 +149,7 @@
         if (!['user', 'superuser', 'tenant_admin', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
         if (!['Y', 'N'].includes(u.active)) throw new Error('Active must be Y or N on row ' + (i + 2));
         if (u.password && u.password.length < 12) throw new Error('Password must be at least 12 characters when supplied on row ' + (i + 2));
-        if (!u.organization || (u.organization === 'global' && u.role !== 'admin') || (u.organization !== 'global' && u.role === 'admin')) throw new Error('Invalid organization and role combination on row '+(i+2));
+        if (!u.organization || (u.organization !== 'global' && !/^[a-z0-9]+(-[a-z0-9]+)*$/.test(u.organization)) || (u.organization === 'global' && u.role !== 'admin') || (u.organization !== 'global' && u.role === 'admin')) throw new Error('Invalid organization and role combination on row '+(i+2));
         seen.add(u.email+':'+u.organization); return u;
       });
       bulkUsers.forEach(u => $('bulkRows').append(el('tr', {},
@@ -160,7 +160,7 @@
     } catch (err) { bulkUsers = []; bulkSay(err.message, true); }
   });
   $('bulkCreate').addEventListener('click', async () => {
-    if (!bulkUsers.length || !confirm('Apply ' + bulkUsers.length + ' user rows? Existing accounts will only have their active status updated.')) return;
+    if (!bulkUsers.length || !confirm('Apply ' + bulkUsers.length + ' user rows? Organization rows update membership only. Global rows may change account status.')) return;
     $('bulkCreate').disabled = true;
     bulkSay('Applying changes...');
     try {

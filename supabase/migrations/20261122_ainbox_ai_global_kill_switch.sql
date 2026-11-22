@@ -17,4 +17,12 @@ returns boolean language sql stable security definer set search_path='' as $$
 $$;
 revoke all on function public.ainbox_ai_is_enabled() from public,anon;
 grant execute on function public.ainbox_ai_is_enabled() to authenticated;
+create or replace function public.ainbox_ai_runtime_settings(p_tenant uuid)
+returns jsonb language plpgsql stable security definer set search_path='' as $
+declare result jsonb;
+begin
+ if not public.ainbox_authorized(p_tenant,false) then raise exception 'Action Inbox access required' using errcode='42501'; end if;
+ select jsonb_build_object('model',model,'timeout_ms',timeout_ms,'max_tokens',max_tokens,'enabled',enabled) into result from public.ainbox_ai_settings where id=1;
+ return result;
+end $;
 commit;

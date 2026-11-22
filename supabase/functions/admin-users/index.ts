@@ -74,15 +74,15 @@ Deno.serve(async (req) => {
         const email = String(v.email ?? '').trim().toLowerCase();
         const full_name = String(v.full_name ?? '').trim();
         const password = String(v.password ?? '');
-        const role = String(v.role ?? '').trim().toLowerCase();
+        const role = String(v.role ?? '').trim().toLowerCase();\n        const active = String(v.active ?? '').trim().toUpperCase();
         if (!EMAIL.test(email) || email.length > 254 || !full_name || full_name.length > 200 ||
-            password.length < 12 || password.length > 128 || !['user', 'superuser', 'admin'].includes(role) || seen.has(email))
-          return json({ error: 'Invalid or duplicate CSV entry. Each user needs a unique email, name, role, and password of 12 to 128 characters.' }, 400);
-        seen.add(email); entries.push({ email, full_name, password, role });
+            password.length > 128 || (password.length > 0 && password.length < 12) || !['Y', 'N'].includes(active) || !['user', 'superuser', 'admin'].includes(role) || seen.has(email))
+          return json({ error: 'Invalid or duplicate CSV entry. Each user needs a unique email, name, role, and active Y/N. Supplied passwords must be 12 to 128 characters.' }, 400);
+        seen.add(email); entries.push({ email, full_name, password, role, active });
       }
-      const { data: existing, error: existingError } = await db.from('profiles').select('email').in('email', entries.map(v => v.email));
+      const { data: existing, error: existingError } = await db.from('profiles').select('id,email,disabled').in('email', entries.map(v => v.email));
       if (existingError) return fail(existingError);
-      const known = new Set((existing ?? []).map(v => String(v.email).toLowerCase()));
+      const known = new Map((existing ?? []).map(v => [String(v.email).toLowerCase(), v]));
       const results = [];
       for (const entry of entries) {
         const { email, full_name, password, role } = entry;
@@ -97,7 +97,7 @@ Deno.serve(async (req) => {
         const uid = data.user?.id;
         if (!uid) { results.push({ email, status: 'failed', error: 'No user ID returned.' }); continue; }
         const { error: profileError } = await db.from('profiles').upsert({
-          id: uid, email, full_name, is_admin: role === 'admin', is_superuser: role === 'superuser'
+          id: uid, email, full_name, is_admin: role === 'admin', is_superuser: role === 'superuser', disabled: active === 'N'
         }, { onConflict: 'id' });
         if (profileError) {
           // Do not leave a partly provisioned account with incorrect permissions.

@@ -64,7 +64,7 @@
         </div>
       </div>
     </div>
-    <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/action-inbox/">Action Inbox</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
+    <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/action-inbox/">Action Inbox</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
   document.body.prepend(nav);
   nav.querySelectorAll('nav a').forEach(a => {
     if (location.pathname.startsWith(a.getAttribute('href'))) a.setAttribute('aria-current', 'page');

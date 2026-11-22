@@ -46,7 +46,7 @@ async function refreshModels(selected){
  button.disabled=true;picker.disabled=true;say('Loading models from NVIDIA…');
  try{
   const {data,error}=await App.sb.functions.invoke('ainbox-ai-models',{body:{}});
-  if(error||data?.error)throw Error(data?.error||error.message);
+  if(error||data?.error){let message=data?.error||error?.message||'Provider unavailable';try{const detail=await error?.context?.json();message=detail?.error||message}catch{}throw Error(message)}
   if(!Array.isArray(data?.models)||!data.models.length)throw Error('No models returned');
   picker.replaceChildren();
   const alternate=$('globalAiAlternateModel'),prior=alternate.value;
@@ -105,16 +105,22 @@ async function loadComponents(){
  }
 }
 async function load(){
+ let settings=null;
+ try{settings=await rpc('ainbox_ai_get_settings')}catch(e){say('Could not read saved model settings: '+e.message,true)}
  try{
-  const settings=await rpc('ainbox_ai_get_settings');
-  const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
-  await loadComponents();
-  try{await loadUsage()}catch(e){$('globalAiUsage').textContent='Could not load usage: '+e.message}
-  await refreshModels(settings.model);
+  const {data:enabled,error}=await App.sb.rpc('ainbox_ai_is_enabled');
+  if(error)throw error;
+  enabledToggle.checked=enabled===true;
+  $('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
+ }catch(e){$('globalAiSwitchStatus').textContent='AI switch unavailable: '+e.message}
+ if(settings){
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);
-  say('Settings loaded. Changes apply to the next AI assessment.');
- }catch(e){say('Unable to load AI settings: '+e.message,true);}
+ }
+ // Model discovery is independent of usage, component permissions, and dashboard RPCs.
+ await refreshModels(settings?.model||$('globalAiModel').value);
+ try{await loadComponents()}catch(e){$('globalAiComponentsStatus').textContent='Component settings unavailable: '+e.message}
+ try{await loadUsage()}catch(e){$('globalAiUsage').textContent='Usage unavailable: '+e.message}
 }
 form.addEventListener('submit',async event=>{
  event.preventDefault();

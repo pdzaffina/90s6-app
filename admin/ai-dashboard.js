@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data};
 const money=v=>'$'+Number(v||0).toFixed(4);
-let authorized=false;
+let authorized=false;let evaluationRuns={A:null,B:null};
 async function load(){
  if(!authorized)return;
  $('error').textContent='';
@@ -20,7 +20,7 @@ async function load(){
   const components=summary.components||[];
   if(!components.length)container.textContent='No requests tracked this month.';
   for(const component of components){const line=document.createElement('p');line.textContent=component.component_key+': '+Number(component.requests).toLocaleString()+' requests, '+money(component.cost)+' estimated';container.append(line)}
-  await Promise.allSettled([loadAudit(),loadGovernance(),loadEffectiveness()]);
+  await Promise.allSettled([loadAudit(),loadGovernance(),loadEffectiveness(),loadModelRatings()]);
   $('dashboard').hidden=false;
  }catch(e){$('error').textContent='Could not load AI usage: '+e.message}
 }
@@ -93,16 +93,32 @@ $('evalRun').onclick=async()=>{
  const button=$('evalRun');button.disabled=true;$('evalStatus').textContent='Running two audited model comparisons...';
  try{
   const original=await rpc('ai_replay_source',{p_usage:source});if(!original)throw Error('Source request not available');
-  for(const [model,output,meta] of [[a,'evalOutputA','evalMetaA'],[b,'evalOutputB','evalMetaB']]){
+  evaluationRuns={A:null,B:null};
+  for(const [model,output,meta,slot] of [[a,'evalOutputA','evalMetaA','A'],[b,'evalOutputB','evalMetaB','B']]){
    $(output).textContent='Running '+model+'...';
    try{
     const t=performance.now(),result=await invokeGateway({tenant_id:original.tenant_id,source_usage_id:source,component:'evaluation',model});
+    evaluationRuns[slot]=result.usage_id;
     $(output).textContent=result.content;$(meta).textContent=model+' · '+(performance.now()-t).toFixed(0)+' ms · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · '+result.usage_id;
    }catch(e){$(output).textContent='Failed: '+e.message;$(meta).textContent=model}
   }
   $('evalStatus').textContent='Comparison complete. Evaluate the content manually for quality.';await loadAudit();
  }catch(e){$('evalStatus').textContent='Comparison failed: '+e.message}
  finally{button.disabled=false}
+};
+async function loadModelRatings(){
+ try{
+  const data=await rpc('ai_evaluation_summary'),target=$('modelRatings');target.replaceChildren();
+  if(!data.length){target.textContent='No human-scored evaluations yet.';return}
+  for(const row of data){const line=document.createElement('p');line.textContent=row.model+' · '+row.rated+' rated · '+row.mean_quality+'/5 quality · '+money(row.mean_cost_usd)+' average cost · '+row.mean_latency_ms+' ms average latency';target.append(line)}
+ }catch(e){$('modelRatings').textContent='Ratings unavailable: '+e.message}
+}
+$('scoreSave').onclick=async()=>{
+ const usage=evaluationRuns[$('scoreModel').value];
+ if(!usage){$('scoreStatus').textContent='Run a comparison before rating this model.';return}
+ const accuracy=Number($('scoreAccuracy').value),completeness=Number($('scoreCompleteness').value),actionability=Number($('scoreActionability').value);
+ try{await rpc('ai_evaluation_rate',{p_usage:usage,p_accuracy:accuracy,p_completeness:completeness,p_actionability:actionability,p_notes:$('scoreNotes').value});$('scoreStatus').textContent='Evaluation saved.';await loadModelRatings()}
+ catch(e){$('scoreStatus').textContent='Could not save rating: '+e.message}
 };
 $('gatewayRun').onclick=async()=>{
  const button=$('gatewayRun');button.disabled=true;$('gatewayStatus').textContent='Submitting audited request...';

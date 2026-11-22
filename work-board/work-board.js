@@ -313,7 +313,7 @@
     <div class="wcBody">
       <div class="field"><label>Columns</label><div id="wcCols" class="wcList"></div><button type="button" class="ghost" id="wcAddCol">+ Add column</button></div>
       <div class="field"><label>Swimlanes</label><div id="wcLanes" class="wcList"></div><button type="button" class="ghost" id="wcAddLane">+ Add swimlane</button></div>
-      <p id="wcLayoutMsg" class="wcMuted"></p>
+      <div class="actions"><button type="button" class="ghost" id="wcLayoutExport">Export layout (.json)</button><button type="button" class="ghost" id="wcLayoutImport">Import layout (.json)</button><input id="wcLayoutFile" type="file" accept=".json,application/json" hidden></div><p class="wcMuted">Layout files contain columns, swimlanes, and descriptions only. Work items are not exported.</p><p id="wcLayoutMsg" class="wcMuted"></p>
       <div class="actions"><button type="button" id="wcLayoutCancel">Cancel</button><button type="button" class="primary" id="wcLayoutSave">Save layout</button></div>
     </div>`;
   document.body.append(ldlg);
@@ -354,6 +354,59 @@
   };
   $('wcAddCol').addEventListener('click', () => addRow('cols', 'columns'));
   $('wcAddLane').addEventListener('click', () => addRow('lanes', 'swimlanes'));
+  // Layout templates are portable across boards and organizations; never include work items.
+  $('wcLayoutExport').addEventListener('click', () => {
+    if (!canManage || !current || current.role === 'viewer') return;
+    const payload = {
+      format: '90s6-work-board-layout', version: 1,
+      columns: draft.cols.map(({ name, hint }) => ({ name: name.trim(), hint: hint.trim() })),
+      lanes: draft.lanes.map(({ name, hint }) => ({ name: name.trim(), hint: hint.trim() }))
+    };
+    const file = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(file);
+    const a = el('a', { href: url, download: '90s6-board-layout.json' });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
+  $('wcLayoutImport').addEventListener('click', () => {
+    if (!canManage || !current || current.role === 'viewer') return;
+    $('wcLayoutFile').value = '';
+    $('wcLayoutFile').click();
+  });
+  $('wcLayoutFile').addEventListener('change', async e => {
+    if (!canManage || !current || current.role === 'viewer') return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      if (file.size > 100000) throw Error('Layout file is too large.');
+      const payload = JSON.parse(await file.text());
+      if (payload.format !== '90s6-work-board-layout' || payload.version !== 1)
+        throw Error('Not a supported 90S6 board layout file.');
+      const validate = (rows, label) => {
+        if (!Array.isArray(rows) || rows.length < 1 || rows.length > 8)
+          throw Error(label + ' must contain 1 to 8 entries.');
+        const result = rows.map(row => {
+          if (!row || typeof row.name !== 'string' || !row.name.trim() || row.name.length > 30 ||
+              (row.hint != null && (typeof row.hint !== 'string' || row.hint.length > 80)))
+            throw Error('Invalid ' + label.toLowerCase() + ' name or description.');
+          return { name: row.name.trim(), hint: (row.hint || '').trim() };
+        });
+        if (new Set(result.map(row => row.name.toLowerCase())).size !== result.length)
+          throw Error(label + ' names must be unique.');
+        return result;
+      };
+      const cols = validate(payload.columns, 'Columns');
+      const lanes = validate(payload.lanes, 'Swimlanes');
+      const currentLayout = board.getLayout();
+      // Match by name to retain work item placement where possible.
+      draft = {
+        cols: cols.map(row => ({ ...row, orig: currentLayout.columns.find(c => c.name.toLowerCase() === row.name.toLowerCase())?.name || null })),
+        lanes: lanes.map(row => ({ ...row, orig: currentLayout.lanes.find(c => c.name.toLowerCase() === row.name.toLowerCase())?.name || null }))
+      };
+      drawLayout('cols'); drawLayout('lanes');
+      layoutMsg('Layout imported for review. Select Save layout to apply it. Work items in unmatched categories will move to the first column or swimlane.');
+    } catch (err) { layoutMsg('Import failed: ' + err.message); }
+  });
   $('wcLayoutCancel').addEventListener('click', () => ldlg.close());
 
   $('wcLayoutSave').addEventListener('click', async () => {

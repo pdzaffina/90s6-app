@@ -1,0 +1,45 @@
+name: Action Inbox validation
+on:
+  pull_request:
+    paths:
+      - 'action-inbox/**'
+      - 'work-board/**'
+      - 'portfolio-management/**'
+      - 'shared/**'
+      - 'supabase/migrations/*ainbox*'
+      - '.github/workflows/action-inbox-checks.yml'
+  workflow_dispatch:
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate JavaScript syntax
+        run: |
+          node --check action-inbox/inbox.js
+          node --check work-board/board.js
+          node --check work-board/work-board.js
+          node --check portfolio-management/portfolio.js
+          node --check shared/app.js
+          node --check shared/feature-home.js
+          node --check tenant-admin/tenant-admin.js
+          node --check admin/features.js
+      - name: Verify migration order and security baseline
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          files=sorted(Path('supabase/migrations').glob('*ainbox*.sql'))
+          assert len(files)>=8, files
+          names=[p.name for p in files]
+          assert names==sorted(names)
+          foundation=files[0].read_text()
+          for table in ['workstreams','metrics','metric_observations','rules','rule_versions','scan_runs','exceptions','remediation_plans','remediation_steps','communications','communication_versions','activity_events']:
+              assert f'public.ainbox_{table}' in foundation
+              assert f'alter table public.ainbox_{table} enable row level security' in foundation
+              assert f'revoke all on public.ainbox_{table} from anon,authenticated' in foundation
+          assert 'action_inbox' in Path('shared/app.js').read_text()
+          assert 'action_inbox' in Path('tenant-admin/tenant-admin.js').read_text()
+          print('Action Inbox static baseline validated:',len(files),'migrations')
+          PY

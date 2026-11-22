@@ -23,6 +23,7 @@ async function load(){
   await Promise.allSettled([loadAudit(),loadGovernance(),loadEffectiveness(),loadModelRatings()]);
  }catch(e){$('error').textContent='Could not load AI usage: '+e.message}
 }
+const isNonChatModel=id=>/(?:^|[\\/_.-])(embed(?:ding|dings)?|rerank(?:er|ing)?|retriev(?:al|er)|reward|guardrail|safety-classifier|text-to-image|image-to-text|speech|asr|tts|vision-encoder)(?:$|[\\/_.-])/i.test(id);
 async function loadEvaluationModels(){
  const picker=$('evalModelB'),button=$('evalRefreshModels'),prior=picker.value;
  button.disabled=true;picker.disabled=true;
@@ -31,17 +32,19 @@ async function loadEvaluationModels(){
   if(error||data?.error)throw Error(data?.error||error?.message||'Provider discovery failed');
   if(!Array.isArray(data?.models)||!data.models.length)throw Error('No provider models returned');
   picker.replaceChildren(new Option('Choose Model B...',''));
+  let excluded=0;
   for(const model of data.models){
    if(typeof model.id!=='string'||!model.id)continue;
+   if(isNonChatModel(model.id)){excluded++;continue}
    const label=model.label&&model.label!==model.id?model.label+' ('+model.id+')':model.id;
    picker.add(new Option(label,model.id));
   }
-  if([...picker.options].some(option=>option.value===prior))picker.value=prior;
-  $('evalStatus').textContent=String(data.models.length)+' provider models available. Some may not support chat completions.';
+  if(prior&&!isNonChatModel(prior)&&[...picker.options].some(option=>option.value===prior))picker.value=prior;
+  $('evalStatus').textContent=(picker.options.length-1)+' potential chat models listed; '+excluded+' non-chat models excluded. Provider compatibility is confirmed when you run a comparison.';
  }catch(e){
   picker.replaceChildren(new Option('Choose Model B...',''),new Option('GPT-OSS 20B (fallback)','openai/gpt-oss-20b'),new Option('GPT-OSS 120B (fallback)','openai/gpt-oss-120b'));
-  if(prior&&![...picker.options].some(option=>option.value===prior))picker.add(new Option('Previously selected: '+prior,prior));
-  picker.value=prior||'';
+  if(prior&&!isNonChatModel(prior)&&![...picker.options].some(option=>option.value===prior))picker.add(new Option('Previously selected: '+prior,prior));
+  picker.value=isNonChatModel(prior)?'':prior||'';
   $('evalStatus').textContent='Model discovery unavailable: '+e.message+'. Fallback choices shown.';
  }finally{picker.disabled=false;button.disabled=false}
 }
@@ -144,20 +147,22 @@ const invokeGateway=async payload=>{
 };
 $('evalRun').onclick=async()=>{
  const source=$('evalSource').value.trim(),a=$('evalModelA').value.trim(),b=$('evalModelB').value.trim();
- if(!source||!a||!b){$('evalStatus').textContent='Select a source request and enter both model IDs.';return}
+ if(!source||!a||!b){$('evalStatus').textContent='Select an audited request and choose Model B.';return}
+ if(isNonChatModel(b)){$('evalStatus').textContent='Model B is not a chat-completion model. Choose a generative language model instead.';return}
  const button=$('evalRun');button.disabled=true;$('evalStatus').textContent='Running two audited model comparisons...';
  try{
   const original=await rpc('ai_replay_source',{p_usage:source});if(!original)throw Error('Source request not available');
   evaluationRuns={A:null,B:null};
+  let failures=0;
   for(const [model,output,meta,slot] of [[a,'evalOutputA','evalMetaA','A'],[b,'evalOutputB','evalMetaB','B']]){
    $(output).textContent='Running '+model+'...';
    try{
     const t=performance.now(),result=await invokeGateway({tenant_id:original.tenant_id,source_usage_id:source,component:'evaluation',model});
     evaluationRuns[slot]=result.usage_id;
     $(output).textContent=result.content;$(meta).textContent=model+' · '+(performance.now()-t).toFixed(0)+' ms · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · '+result.usage_id;
-   }catch(e){$(output).textContent='Failed: '+e.message;$(meta).textContent=model}
+   }catch(e){failures++;$(output).textContent='Failed: '+e.message;$(meta).textContent=model+' · Failed'}
   }
-  $('evalStatus').textContent='Comparison complete. Evaluate the content manually for quality.';await loadAudit();
+  $('evalStatus').textContent=failures===0?'Comparison complete. Evaluate both responses for quality.':failures===2?'Comparison failed: neither model returned a response.':'Comparison incomplete: one model failed. Choose another chat model and retry.';await loadAudit();
  }catch(e){$('evalStatus').textContent='Comparison failed: '+e.message}
  finally{button.disabled=false}
 };

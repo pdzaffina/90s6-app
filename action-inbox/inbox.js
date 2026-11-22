@@ -81,9 +81,10 @@ async function change(x,status,until){
  try{await rpc('ainbox_set_exception_state',{p_tenant:tenant,p_id:x.id,p_status:status,p_revision:x.revision,p_snoozed_until:until||null});await load()}
  catch(e){msg('Action failed: '+e.message)}
 }
+function showScanResult(res,rule){const unknown=Number(res?.unknown||0),evaluated=Number(res?.evaluated||0),violations=Number(res?.violations||0);const box=$('ainboxScanResult');if(!box)return;box.hidden=false;box.className='ainbox-scan-result'+(unknown?' ainbox-scan-warning':'');box.innerHTML='<strong>'+esc(rule?.rule_key||'Rule')+' scan completed</strong><p>'+evaluated+' evaluated · '+violations+' violations · '+unknown+' unknown</p>'+(unknown?'<p><strong>Action needed:</strong> Some records lack information required for a reliable result. '+(rule?.rule_key==='WORK-001'?'In Work Boards, open Board Layout, designate a completion column, and save the layout to establish stable column IDs. Existing items with no trustworthy column assignment remain Unknown until corrected.':rule?.rule_key==='KB-002'?'Older drafts without a reliable Draft entry date remain Unknown until an authoritative baseline exists.':'Review missing assessment or source status information.')+'</p>':'<p>All records in this scan were classified.</p>');}
 function setTab(v){
  tab=v;document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===v)));
- $('ainboxWorkspace').hidden=v==='rules';$('ainboxRules').hidden=v!=='rules';$('ainboxScan').hidden=v!=='rules'||!allowedAdmin();
+ $('ainboxWorkspace').hidden=v==='rules';document.querySelector('.ainbox-filters').hidden=v==='rules';$('ainboxRules').hidden=v!=='rules';$('ainboxScan').hidden=v!=='rules'||!allowedAdmin();
  if(v==='rules')loadRules();else load();
 }
 async function loadRules(){
@@ -94,7 +95,7 @@ async function loadRules(){
  let cfg={...rule.configuration};if(rule.evaluator_type==='KB-002'){const t=prompt('Maximum Draft age in calendar days',String(cfg.threshold_days||5));if(t===null)return;cfg.threshold_days=Number(t)}else if(rule.evaluator_type==='WORK-001'){const t=prompt('IANA organization timezone',cfg.timezone||'UTC');if(t===null)return;cfg.timezone=t}else{const t=prompt('Comma-separated active initiative statuses',(cfg.active_statuses||['active']).join(','));if(t===null)return;cfg.active_statuses=t.split(',').map(x=>x.trim()).filter(Boolean)}
  try{await rpc('ainbox_configure_rule',{p_tenant:tenant,p_rule:rule.id,p_enabled:enabled,p_interval:minutes,p_config:cfg});await loadRules()}catch(e){msg(e.message)}
  });
- el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('Scan complete: '+JSON.stringify(res));await loadRules()}catch(e){msg('Scan failed: '+e.message)}finally{b.disabled=false}});
+ el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('');showScanResult(res,rules.find(x=>x.id===b.dataset.run));await loadRules()}catch(e){msg('Scan failed: '+e.message)}finally{b.disabled=false}});
  }catch(e){el.textContent='Rules are unavailable: '+e.message}
 }
 document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));

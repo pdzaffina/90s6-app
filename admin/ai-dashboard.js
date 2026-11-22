@@ -23,6 +23,29 @@ async function load(){
   await Promise.allSettled([loadAudit(),loadGovernance(),loadEffectiveness(),loadModelRatings()]);
  }catch(e){$('error').textContent='Could not load AI usage: '+e.message}
 }
+async function loadEvaluationModels(){
+ const picker=$('evalModelB'),button=$('evalRefreshModels'),prior=picker.value;
+ button.disabled=true;picker.disabled=true;
+ try{
+  const {data,error}=await App.sb.functions.invoke('ainbox-ai-models',{body:{}});
+  if(error||data?.error)throw Error(data?.error||error?.message||'Provider discovery failed');
+  if(!Array.isArray(data?.models)||!data.models.length)throw Error('No provider models returned');
+  picker.replaceChildren(new Option('Choose Model B...',''));
+  for(const model of data.models){
+   if(typeof model.id!=='string'||!model.id)continue;
+   const label=model.label&&model.label!==model.id?model.label+' ('+model.id+')':model.id;
+   picker.add(new Option(label,model.id));
+  }
+  if([...picker.options].some(option=>option.value===prior))picker.value=prior;
+  $('evalStatus').textContent=String(data.models.length)+' provider models available. Some may not support chat completions.';
+ }catch(e){
+  picker.replaceChildren(new Option('Choose Model B...',''),new Option('GPT-OSS 20B (fallback)','openai/gpt-oss-20b'),new Option('GPT-OSS 120B (fallback)','openai/gpt-oss-120b'));
+  if(prior&&![...picker.options].some(option=>option.value===prior))picker.add(new Option('Previously selected: '+prior,prior));
+  picker.value=prior||'';
+  $('evalStatus').textContent='Model discovery unavailable: '+e.message+'. Fallback choices shown.';
+ }finally{picker.disabled=false;button.disabled=false}
+}
+$('evalRefreshModels').onclick=loadEvaluationModels;
 async function loadAudit(){
  const rows=await rpc('ai_audit_search',{p_limit:200,p_component:$('auditComponent').value||null,p_model:$('auditModel').value.trim()||null,p_status:$('auditStatus').value||null,p_query:$('auditSearch').value.trim()||null,p_since:null});
  $('auditExplorerStatus').textContent=rows.length+' matching requests (up to 200 displayed)';
@@ -189,6 +212,6 @@ App.onSession(async(session,profile)=>{
  authorized=!!session&&!!profile?.is_admin;
  if(!authorized){$('error').textContent='Global administrator access required.';$('dashboard').hidden=true;return}
  $('dashboard').hidden=false;
- await load();
+ await Promise.allSettled([load(),loadEvaluationModels()]);
 });
 })();

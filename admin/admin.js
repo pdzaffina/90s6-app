@@ -111,7 +111,7 @@
       'new.user@example.com,Example User,ChangeMe2026!user,user,Y',
       'new.superuser@example.com,Example Superuser,ChangeMe2026!super,superuser,N',
       'new.admin@example.com,Example Admin,ChangeMe2026!admin,admin,Y'
-    ].join('\\r\\n') + '\\r\\n';
+    ].join('\r\n') + '\r\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = el('a', { href: url, download: '90s6-bulk-users-template.csv' });
     document.body.append(a); a.click(); a.remove();

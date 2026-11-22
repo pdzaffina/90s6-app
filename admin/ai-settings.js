@@ -149,6 +149,7 @@ async function load(){
   const settings=await rpc('ainbox_ai_get_settings');
   const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
   await loadComponents();
+  try{await loadUsage()}catch(e){$('globalAiUsage').textContent='Could not load usage: '+e.message}
   await refreshModels(settings.model);
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);

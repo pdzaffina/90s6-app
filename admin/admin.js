@@ -277,6 +277,45 @@
   let auditRows = [], auditMore = false;
   const auditSay = (t, err) => { const m = $('auditMsg'); m.textContent = t || ''; m.className = 'ap-msg' + (err ? ' err' : ''); };
 
+  const auditDetailValue = value => {
+    if(value === null || value === undefined)return 'Not recorded';
+    if(typeof value === 'object')return JSON.stringify(value,null,2);
+    return String(value);
+  };
+  function auditEntry(r) {
+    const row=el('tr');
+    const detailRow=el('tr',{hidden:true});
+    const detailCell=el('td',{colSpan:4});
+    const panel=el('div',{className:'audit-detail-panel'});
+    const add=(label,value)=>{
+      const section=el('div',{className:'audit-detail-item'});
+      section.append(el('strong',{textContent:label}),el('pre',{textContent:auditDetailValue(value)}));
+      panel.append(section);
+    };
+    add('Action',r.action);
+    if(r.target)add('Affected record',r.target);
+    if(r.board_id)add('Board ID',r.board_id);
+    if(r.actor_id)add('Actor ID',r.actor_id);
+    const detail=r.detail && typeof r.detail==='object'?r.detail:{};
+    const changes=detail.changes||detail.before&&detail.after&&{before:detail.before,after:detail.after};
+    if(changes)add('Recorded changes',changes);
+    for(const [key,value] of Object.entries(detail)){
+      if(['changes','before','after'].includes(key))continue;
+      add(key.replace(/_/g,' '),value);
+    }
+    if(detail.before)add('Before',detail.before);
+    if(detail.after)add('After',detail.after);
+    if(!Object.keys(detail).length)add('Additional details','This event did not record field-level changes.');
+    const button=el('button',{type:'button',className:'ap-btn sm',textContent:'Details','aria-expanded':'false'});
+    button.onclick=()=>{
+      detailRow.hidden=!detailRow.hidden;
+      button.textContent=detailRow.hidden?'Details':'Hide';
+      button.setAttribute('aria-expanded',String(!detailRow.hidden));
+    };
+    row.append(el('td',{textContent:Audit.when(r.at)}),el('td',{textContent:Audit.who(r)}),el('td',{textContent:Audit.describe(r)}),el('td',{},button));
+    detailCell.append(panel);detailRow.append(detailCell);
+    return [row,detailRow];
+  }
   async function loadAudit(reset) {
     if (reset) { auditRows = []; $('auditRows').replaceChildren(); }
     auditSay('Loading...');
@@ -285,10 +324,10 @@
       const { rows, more } = await call('audit', { prefix: $('auditPrefix').value, actor: $('auditActor').value.trim(), before, limit: 100 });
       rows.forEach(r => {
         auditRows.push(r);
-        $('auditRows').append(el('tr', {}, el('td', { textContent: Audit.when(r.at) }), el('td', { textContent: Audit.who(r) }), el('td', { textContent: Audit.describe(r) })));
+        $('auditRows').append(...auditEntry(r));
       });
       auditMore = more; $('auditMore').hidden = !more;
-      auditSay(auditRows.length ? auditRows.length + ' events shown' : 'No events match.');
+      auditSay(auditRows.length ? auditRows.length + ' events shown. Expand Details to see recorded fields.' : 'No events match.');
     } catch (e) { auditSay(e.message, true); }
   }
   $('auditForm').addEventListener('submit', e => { e.preventDefault(); loadAudit(true); });

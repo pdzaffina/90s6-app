@@ -60,9 +60,18 @@ Deno.serve(async(req)=>{
    return respond({error:"NVIDIA returned HTTP "+result.status+(reason?": "+reason:"")+". Check the selected model and provider credentials."},502);
   }
   const json=await result.json();
-  let assessment=String(json?.choices?.[0]?.message?.content||"").trim();
+  const choice=json?.choices?.[0];
+  const raw=choice?.message?.content;
+  let assessment=typeof raw==="string"?raw.trim():Array.isArray(raw)?raw.filter((part:any)=>part?.type==="text"&&typeof part.text==="string").map((part:any)=>part.text).join(" ").trim():"";
+  if(!assessment){
+   const finish=String(choice?.finish_reason||"unknown");
+   const usage=json?.usage||{};
+   console.warn("NVIDIA returned no visible text",JSON.stringify({model,finish_reason:finish,prompt_tokens:usage.prompt_tokens??null,completion_tokens:usage.completion_tokens??null,reasoning_tokens:usage.completion_tokens_details?.reasoning_tokens??null,content_type:raw===null?"null":Array.isArray(raw)?"array":typeof raw}));
+   const tokenHint=finish==="length"?" The model exhausted its output token budget before producing visible text. Increase Maximum output tokens in Global Admin.":" Check that the selected model supports chat-completions text output.";
+   return respond({error:"NVIDIA returned no visible assessment (finish reason: "+finish+")."+tokenHint},502);
+  }
   assessment=assessment.replace(/<[^>]*>/g,"").slice(0,1000);
-  if(!assessment)return respond({error:"The model returned no assessment. Try again."},502);
+
   const sentences=assessment.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];
   assessment=sentences.slice(0,3).join(" ").trim();
   return respond({assessment,model,scope:"assigned_accessible",facts:{active_count:facts.active_count,high_priority_count:facts.high_priority_count,in_progress_count:facts.in_progress_count},generated_at:new Date().toISOString()});

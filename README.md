@@ -1,87 +1,84 @@
-# 90S6 App
+# 90s6 | From Knowledge to Action
 
-The authenticated 90S6 workspace at **https://app.90s6.com**.
+**Learn what matters. Decide what comes next. Get meaningful work done.**
 
-A static HTML/CSS/vanilla JavaScript application hosted on GitHub Pages. Supabase provides authentication, Postgres, Storage, row-level security, and the `admin-users` Edge Function.
+[Open the 90s6 App](https://app.90s6.com) · [Visit 90s6](https://90s6.com)
 
-## Repository and deployment
+## Why 90s6 exists
 
-- Repository: `90s6-app`
-- Production hostname: `app.90s6.com`
-- Hosting: GitHub Pages, deployed by `.github/workflows/pages.yml`
-- Backend: Supabase
-- Frontend: no framework, bundler, or npm dependencies
+Organizations rarely struggle because they lack information. They struggle to turn what they know into clear priorities, coordinated decisions, and consistent execution.
 
-The repository is intended to be public. The Supabase anon key is a browser key and is not a secret. Never commit a Supabase service-role key, access token, or password.
+Training lives in one place. Useful prompts and institutional knowledge live somewhere else. Plans are built in spreadsheets, priorities are debated in meetings, and the work itself is tracked in yet another tool. Context gets lost between each step.
 
-## 1. Create and publish the GitHub repository
+**90s6 brings those activities together.**
 
-Create a **public** repository named `90s6-app` under the GitHub account that owns the 90S6 website. Upload the contents of this folder to the repository root, preserving the directory structure, and use `main` as the default branch.
+It is a practical workspace designed to help people build capability, apply knowledge, make better decisions, and move work forward. The goal is not more administration or another dashboard. It is less friction between understanding what needs to happen and actually making it happen.
 
-The `CNAME` file is already set to `app.90s6.com`. The Pages workflow deploys the repository root on every push to `main`.
+## What the platform brings together
 
-In GitHub, open **Settings → Pages** and select **GitHub Actions** as the build and deployment source. After the first successful deployment, add `app.90s6.com` as the custom domain if GitHub has not already picked it up from `CNAME`, then enable **Enforce HTTPS** when it becomes available.
+### Learn and build capability
 
-## 2. Configure Squarespace DNS
+The **Training** experience delivers structured, engaging courses that help people develop useful skills and put them to work. Learning is intended to be practical, accessible, and connected to real work.
 
-In Squarespace, open the domain's DNS settings for `90s6.com` and add this record:
+### Capture and reuse what works
 
-| Type | Host | Data / Points to | TTL |
-| --- | --- | --- | --- |
-| CNAME | `app` | `pdzaffina.github.io` | Default |
+The **Prompt Library** makes useful AI workflows easier to discover and reuse. The **Knowledge Base** gives teams a place to preserve guidance, lessons, and institutional knowledge so good answers do not have to be rediscovered.
 
-This creates `app.90s6.com`. Do not change the existing root (`@`) or `www` records used by the main 90S6 website. If an `app` record already exists, remove or replace the conflicting record before adding this CNAME.
+The **Content Studio** gives authorized contributors a consistent way to create and maintain courses, prompts, and knowledge articles, with administrative controls over which content types users can manage.
 
-DNS propagation and GitHub's HTTPS certificate issuance can take some time. Do not treat the domain as live until GitHub Pages reports the custom domain as configured and HTTPS is available.
+### Turn ideas into plans
 
-## 3. Configure Supabase
+**Create Custom Plan** helps translate a goal or challenge into an actionable approach. Rather than stopping at a recommendation, the platform is designed to help users move toward execution.
 
-1. In the Supabase SQL Editor, run `supabase/setup.sql`. It is designed to be re-runnable.
-2. Create your own user in Supabase Authentication. Then run the commented SQL statement at the bottom of `supabase/setup.sql` to make your profile the first admin.
-3. Deploy the Edge Function from this repository:
+### Organize and execute work
 
-   ```bash
-   supabase functions deploy admin-users
-   ```
+The **Work Board** supports visual work management and work breakdown structures. Teams can organize work items, tailor their boards, track progress, and share a view of the work with stakeholders. Different views serve different needs, from day-to-day coordination to structured planning.
 
-4. In Supabase Authentication settings:
-   - Disable public sign-ups.
-   - Keep email confirmation enabled.
-   - Set the Site URL to `https://app.90s6.com`.
-   - Add `https://app.90s6.com/**` to the redirect URL allowlist.
-   - Set a minimum password length of at least 12 characters.
-5. Set the Edge Function secret `APP_ORIGIN` to `https://app.90s6.com` if you need to override its default. Supabase supplies `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to the function runtime. The service-role key must remain there and nowhere in the browser or repository.
+### Make priorities visible
 
-## 4. Configure the browser client
+**Portfolio Management** provides a home for comparing initiatives and making deliberate choices across a portfolio of work. Weighted criteria, prioritization, and roadmap-oriented workflows help connect strategic intent to what gets attention and resources.
 
-After creating the Supabase project, run:
+## One connected way of working
 
-```bash
-./configure.sh <project-ref> <anon-public-key>
-```
+The value of 90s6 is not any single feature. It is the relationship between them:
 
-This replaces the project reference in `shared/config.js` and the Content Security Policy `connect-src` directives. It also fills the public anon key in the browser config.
+**Learn → Capture → Plan → Prioritize → Execute → Improve**
 
-Review the resulting diff before committing. The anon key is public by design; RLS policies are the security boundary.
+A course can build understanding. A knowledge article or prompt can make that understanding reusable. A plan can turn an idea into next steps. Portfolio decisions can establish what matters most. A work board can make execution visible.
 
-## Application structure
+These are related activities, not isolated applications.
 
-- `index.html`, `home.js`: authenticated launcher and password change
-- `shared/`: one Supabase client, sign-in gate, navigation, shared styling, audit formatting
-- `work-board/`: Work Board feature, nested tasks, WBS view, sharing, attachments, activity
-- `admin/`: user invitations, account management, admin audit view
-- `supabase/setup.sql`: database schema, functions, grants, RLS, Storage, audit triggers
-- `supabase/functions/admin-users/`: privileged admin operations
+## Who it is for
 
-## Security notes
+90s6 is built for leaders, consultants, teams, and organizations that want to:
 
-- RLS is the actual data-access boundary. Client-side visibility checks are only presentation.
-- Never put the service-role key in this repository or in browser JavaScript.
-- Keep public sign-up disabled. Users should be invited by an administrator.
-- The `admin-users` Edge Function verifies the caller's active admin status before performing privileged actions.
-- GitHub Pages cannot set response headers. The original specification recommends placing Cloudflare in front if you want additional response headers such as `X-Frame-Options`, `X-Content-Type-Options`, and `Referrer-Policy`.
-- Same-origin pages share browser storage and the Supabase session. Only deploy trusted code under `app.90s6.com`.
+- Build practical capability without separating learning from work.
+- Preserve and share useful knowledge instead of repeatedly starting over.
+- Apply AI and other tools to real business problems.
+- Make transparent choices about priorities and tradeoffs.
+- Translate strategy into coordinated, visible execution.
+- Work across multiple initiatives and customer engagements with greater clarity.
 
-## Current validation status
+The platform supports both individual productivity and collaborative work, including 90s6-managed customer engagements.
 
-The supplied build reports simulated-browser and local-Postgres testing. It has not yet been validated against a live Supabase project, real Supabase Storage, invitation email delivery, a production Edge Function runtime, or the production domain. Complete those checks before inviting client users.
+## How we think about the work
+
+**Useful beats impressive.** A tool earns its place when it helps someone make a decision or complete meaningful work.
+
+**Clarity before complexity.** People should be able to understand what matters, who owns the work, and what happens next.
+
+**Knowledge should compound.** Good training, prompts, decisions, and lessons should become reusable assets.
+
+**Priorities require choices.** Not everything can be first. Clear criteria and visible tradeoffs make decisions stronger.
+
+**Execution is the test.** Plans and presentations matter only when they lead to action, learning, and better outcomes.
+
+## Part of the 90s6 experience
+
+The app at **[app.90s6.com](https://app.90s6.com)** is the working environment behind the broader **[90s6](https://90s6.com)** offering. It brings together tools and resources that support advisory work, training, and hands-on execution.
+
+90s6 is being developed as an evolving platform. Its purpose remains consistent: **help people close the gap between knowing and doing.**
+
+---
+
+© 90s6 LLC

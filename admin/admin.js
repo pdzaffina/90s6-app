@@ -271,6 +271,6 @@
     if (!session) return;
     const ok = !!profile.is_admin;
     $('denied').hidden = ok; $('adminBody').hidden = !ok;
-    if (ok) { me = session.user; loadScopes().catch(e=>say(e.message,true)); load(); loadAudit(true); }
+    if (ok) { me = session.user; loadScopes().then(()=>load()).catch(e=>say(e.message,true)); loadAudit(true); }
   });
 })();

@@ -21,7 +21,6 @@ async function load(){
   if(!components.length)container.textContent='No requests tracked this month.';
   for(const component of components){const line=document.createElement('p');line.textContent=component.component_key+': '+Number(component.requests).toLocaleString()+' requests, '+money(component.cost)+' estimated';container.append(line)}
   await Promise.allSettled([loadAudit(),loadGovernance(),loadEffectiveness(),loadModelRatings()]);
-  $('dashboard').hidden=false;
  }catch(e){$('error').textContent='Could not load AI usage: '+e.message}
 }
 async function loadAudit(){
@@ -159,6 +158,7 @@ $('budgetForm').onsubmit=async e=>{
 App.onSession(async(session,profile)=>{
  authorized=!!session&&!!profile?.is_admin;
  if(!authorized){$('error').textContent='Global administrator access required.';$('dashboard').hidden=true;return}
+ $('dashboard').hidden=false;
  await load();
 });
 })();

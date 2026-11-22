@@ -23,7 +23,7 @@ begin
      for item in select value from jsonb_array_elements(b.data) loop
        source_id:=item->>'id';if source_id is null or source_id='' then unknowns:=unknowns+1;continue;end if;
        if nullif(item->>'due','') is null then
-         perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,'Compliant','{}'::jsonb,coalesce((select m.user_id from public.tenant_members m join public.profiles p on p.id=m.user_id where m.tenant_id=p_tenant and m.status='active' and not p.disabled and m.user_id=case when item->>'owner_id' ~ '^[0-9a-f-]{36}
+         perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,'Compliant','{}'::jsonb,work_owner,0);
          continue;
        end if;
        begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;
@@ -36,7 +36,7 @@ begin
        outcome:=case when not complete and due_date<today_local then 'Violation' else 'Compliant' end;
        total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
        evidence:=jsonb_build_object('title',left(coalesce(item->>'title','Work item'),140),'summary','Due '||due_date::text||' and not in a completion column','next_action','Complete the work item or set a valid future due date','due',due_date);
-       perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,outcome,evidence,coalesce((select m.user_id from public.tenant_members m join public.profiles p on p.id=m.user_id where m.tenant_id=p_tenant and m.status='active' and not p.disabled and m.user_id=case when item->>'owner_id' ~ '^[0-9a-f-]{36} then 65 else 0 end);
+       perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,outcome,evidence,work_owner,case when outcome='Violation' then 65 else 0 end);
      end loop;
    end loop;
  elsif r.evaluator_type='KB-002' then

@@ -68,10 +68,24 @@ async function refreshModels(selected){
 }
 $('globalAiRefreshModels').onclick=()=>refreshModels($('globalAiModel').value);
 
+async function loadComponents(){
+ const list=await rpc('ainbox_ai_list_components');
+ const target=$('globalAiComponents');target.replaceChildren();
+ for(const component of list){
+  const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:12px';
+  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=component.enabled;
+  const info=document.createElement('span');
+  const name=document.createElement('strong');name.textContent=component.label;
+  const description=document.createElement('small');description.style.cssText='display:block;opacity:.7';description.textContent=component.description;
+  info.append(name,description);row.append(toggle,info);target.append(row);
+  toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled');}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message;}finally{toggle.disabled=false;}};
+ }
+}
 async function load(){
  try{
   const settings=await rpc('ainbox_ai_get_settings');
   const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
+  await loadComponents();
   await refreshModels(settings.model);
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);

@@ -217,5 +217,6 @@ $('ainboxGenerateAI').onclick=async()=>{
 };
 $('ainboxScan').onclick=loadRules;
 App.onSession(async(s,p)=>{if(!s)return;user=p;aiUserId=s.user.id;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.','warning');return}
+ try{const {data:aiAllowed,error:aiError}=await App.sb.rpc('ainbox_ai_component_enabled',{p_key:'assessment'});$('ainboxAiSection').hidden=!!aiError||aiAllowed!==true;}catch{$('ainboxAiSection').hidden=true;}
  document.querySelector('[data-tab="all"]').hidden=!allowedAdmin();document.querySelector('[data-tab="rules"]').hidden=!allowedAdmin();await load()});
 })();

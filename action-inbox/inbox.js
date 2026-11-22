@@ -188,7 +188,7 @@ $('ainboxGenerateAI').onclick=async()=>{
   if(data?.error)throw Error(data.error);
   if(scope!==aiScope||request!==aiRequest)return;
   if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');
-  output.textContent=data.assessment+'  ·  AI interpretation of assigned, accessible exceptions only.';
+  output.textContent=data.assessment;
   $('ainboxAiBadge').hidden=false;$('ainboxAiDisclaimer').hidden=false;
  }catch(e){if(scope===aiScope&&request===aiRequest)output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}
  finally{button.disabled=false;button.textContent='Generate assessment';}

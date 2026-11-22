@@ -85,3 +85,36 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
   .ap-footer{font-size:8px;letter-spacing:1px}
 }
 @media(max-width:440px){.ap-index{display:none}.ap-section-head{font-size:9px}.ap-card{padding:19px}.ap-footer{flex-direction:column}}
+
+
+/* Two-tier workspace navigation */
+#appNav{display:block;padding:0;min-height:0;background:#fff;color:var(--ap-midnight);box-shadow:0 3px 14px #0a192f12}
+#appNav .ap-nav-top{min-height:64px;background:var(--ap-midnight);color:#fff;display:flex;align-items:center;justify-content:space-between;gap:20px;padding:9px max(24px,calc((100vw - 1280px)/2))}
+#appNav .brand{font-size:24px;font-weight:850;letter-spacing:-1.2px}
+#appNav .brand:before{display:none}
+#appNav .ap-brand-accent{font-size:12px;letter-spacing:.5px;font-weight:600;color:#90cde5;margin-left:3px}
+#appNav .ap-nav-account{display:flex;align-items:center;gap:16px;min-width:0}
+#appNav .ap-org-control{display:flex;align-items:center;gap:9px;min-width:0;max-width:360px;padding:6px 12px;border:1px solid #ffffff60;border-radius:9px;background:#ffffff0d}
+#appNav .ap-org-label{font-size:9px;font-weight:800;letter-spacing:1.2px;color:#b5c9d9}
+#appNav .ap-org-icon{font-size:17px;color:#9ed5e9}
+#appNav #apTenantSelect{appearance:none;-webkit-appearance:none;border:0;outline:0;background:transparent;color:#fff;font:700 13px var(--ap-font);max-width:230px;min-width:100px;cursor:pointer}
+#appNav #apTenantSelect option{background:#fff;color:#0a192f}
+#appNav .ap-tenant-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#appNav .ap-org-chevron{font-size:18px;line-height:1;color:#b5c9d9;pointer-events:none}
+#appNav .ap-user-menu{position:relative}
+#appNav #apUserButton{display:flex;align-items:center;gap:10px;border:0;background:transparent;padding:4px 0 4px 14px;border-left:1px solid #ffffff3b;border-radius:0}
+#appNav .ap-avatar{display:grid;place-items:center;width:34px;height:34px;flex:none;border-radius:50%;background:#087e92;color:#fff;font-size:12px;font-weight:800}
+#appNav .who{color:#e4eef5;font-size:12px;max-width:170px}
+#appNav .ap-user-chevron{font-size:17px;color:#b5c9d9}
+#appNav .ap-user-dropdown{position:absolute;top:calc(100% + 12px);right:0;min-width:180px;background:#fff;border:1px solid #dce3eb;box-shadow:0 12px 35px #0a192f25;border-radius:10px;padding:6px;z-index:30}
+#appNav .ap-user-dropdown a,#appNav .ap-user-dropdown button{display:block;width:100%;text-align:left;text-decoration:none;color:#172c40;background:transparent;border:0;border-radius:6px;padding:10px 12px;font:600 13px var(--ap-font)}
+#appNav .ap-user-dropdown a:hover,#appNav .ap-user-dropdown button:hover{background:#eaf2f8;color:#0a192f}
+#appNav .ap-nav-bottom{background:#fff;border-bottom:1px solid #dce3eb;padding:0 max(24px,calc((100vw - 1280px)/2))}
+#appNav nav{display:flex;align-items:center;gap:5px;min-height:47px;flex-wrap:wrap}
+#appNav nav a{color:#46596b;padding:10px 13px;border-radius:7px;font-weight:650;white-space:nowrap}
+#appNav nav a:hover{background:#eaf2f8;color:#0a192f}
+#appNav nav a[aria-current]{background:#dff3f6;color:#07556a}
+#appNav nav a[href="/admin/"],#appNav nav a[href="/tenant-admin/"]{margin-left:auto}
+#appNav nav a[href="/admin/"]+a{margin-left:0}
+@media(max-width:850px){#appNav .ap-nav-top{padding:9px 16px}#appNav .ap-nav-bottom{padding:0 12px}#appNav nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}#appNav nav a[href="/admin/"],#appNav nav a[href="/tenant-admin/"]{margin-left:0}#appNav .ap-org-label{display:none}}
+@media(max-width:520px){#appNav .brand{font-size:20px}#appNav .ap-nav-account{gap:8px}#appNav .ap-org-control{padding:6px 8px;max-width:190px}#appNav #apTenantSelect{min-width:0;max-width:120px}#appNav .who{display:none}#appNav #apUserButton{padding-left:8px}#appNav .ap-tenant-name{max-width:120px}}

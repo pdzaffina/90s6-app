@@ -74,7 +74,8 @@ Deno.serve(async (req) => {
         const email = String(v.email ?? '').trim().toLowerCase();
         const full_name = String(v.full_name ?? '').trim();
         const password = String(v.password ?? '');
-        const role = String(v.role ?? '').trim().toLowerCase();\n        const active = String(v.active ?? '').trim().toUpperCase();
+        const role = String(v.role ?? '').trim().toLowerCase();
+        const active = String(v.active ?? '').trim().toUpperCase();
         if (!EMAIL.test(email) || email.length > 254 || !full_name || full_name.length > 200 ||
             password.length > 128 || (password.length > 0 && password.length < 12) || !['Y', 'N'].includes(active) || !['user', 'superuser', 'admin'].includes(role) || seen.has(email))
           return json({ error: 'Invalid or duplicate CSV entry. Each user needs a unique email, name, role, and active Y/N. Supplied passwords must be 12 to 128 characters.' }, 400);
@@ -85,8 +86,24 @@ Deno.serve(async (req) => {
       const known = new Map((existing ?? []).map(v => [String(v.email).toLowerCase(), v]));
       const results = [];
       for (const entry of entries) {
-        const { email, full_name, password, role } = entry;
-        if (known.has(email)) { results.push({ email, status: 'skipped' }); continue; }
+        const { email, full_name, password, role, active } = entry;
+        const found = known.get(email);
+        if (found) {
+          if (found.id === user.id) { results.push({ email, status: 'skipped', error: 'Cannot change your own account.' }); continue; }
+          const disabled = active === 'N';
+          if (found.disabled === disabled) { results.push({ email, status: 'skipped' }); continue; }
+          const { error: banError } = await db.auth.admin.updateUserById(found.id, { ban_duration: disabled ? '876000h' : 'none' });
+          if (banError) { results.push({ email, status: 'failed', error: banError.message }); continue; }
+          const { error: statusError } = await db.from('profiles').update({ disabled }).eq('id', found.id);
+          if (statusError) {
+            await db.auth.admin.updateUserById(found.id, { ban_duration: found.disabled ? '876000h' : 'none' });
+            results.push({ email, status: 'failed', error: statusError.message }); continue;
+          }
+          await log('admin.set_disabled', email, { disabled, source: 'bulk_csv' });
+          results.push({ email, status: 'updated' });
+          continue;
+        }
+        if (password.length < 12) { results.push({ email, status: 'failed', error: 'New accounts require a password of at least 12 characters.' }); continue; }
         const { data, error } = await db.auth.admin.createUser({
           email, password, email_confirm: true, user_metadata: { full_name }
         });
@@ -100,13 +117,15 @@ Deno.serve(async (req) => {
           id: uid, email, full_name, is_admin: role === 'admin', is_superuser: role === 'superuser', disabled: active === 'N'
         }, { onConflict: 'id' });
         if (profileError) {
-          // Do not leave a partly provisioned account with incorrect permissions.
-          await db.auth.admin.deleteUser(uid);
-          results.push({ email, status: 'failed', error: 'Profile provisioning failed.' });
+          results.push({ email, status: 'failed', error: 'Profile provisioning failed; account may need admin review.' });
           continue;
         }
-        await log('admin.bulk_create_user', email, { role });
-        known.add(email);
+        if (active === 'N') {
+          const { error: banError } = await db.auth.admin.updateUserById(uid, { ban_duration: '876000h' });
+          if (banError) { results.push({ email, status: 'failed', error: 'Account is inactive, but authentication ban failed.' }); continue; }
+        }
+        await log('admin.bulk_create_user', email, { role, active });
+        known.set(email, { id: uid, email, disabled: active === 'N' });
         results.push({ email, status: 'created' });
       }
       return json({ results });

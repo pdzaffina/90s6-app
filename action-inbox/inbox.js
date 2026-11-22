@@ -1,0 +1,71 @@
+(()=>{'use strict';
+const $=id=>document.getElementById(id),sb=App.sb;
+let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const msg=s=>{$('ainboxMessage').textContent=s||''};
+const date=s=>s?new Date(s).toLocaleString():'Not yet';
+const allowedAdmin=()=>role==='superuser'||role==='tenant_admin'||!!user?.is_admin;
+const rpc=async(name,args)=>{const {data,error}=await sb.rpc(name,args);if(error)throw Error(error.message);return data};
+async function load(){
+ if(!tenant)return;
+ msg('Loading Action Inbox…');
+ try{
+  const [w,a]=await Promise.all([rpc('ainbox_get_workstreams',{p_tenant:tenant}),rpc('ainbox_get_actions',{p_tenant:tenant,p_all:tab==='all'})]);
+  workstreams=Array.isArray(w)?w:[];items=Array.isArray(a)?a:[];
+  const sel=$('ainboxWorkstream'),old=sel.value;sel.replaceChildren(new Option('All workstreams',''),...workstreams.map(x=>new Option(x.name,x.id)));sel.value=workstreams.some(x=>x.id===old)?old:'';
+  if(!items.some(x=>x.id===selected))selected=items[0]?.id||null;
+  msg('');render();
+ }catch(e){msg('Could not load Action Inbox: '+e.message);items=[];render()}
+}
+function filtered(){
+ const w=$('ainboxWorkstream').value,st=$('ainboxStatus').value,q=$('ainboxSearch').value.trim().toLowerCase();
+ return items.filter(x=>(!w||x.workstream_id===w)&&
+ (st==='all'||st==='active'&&x.status!=='resolved'&&x.status!=='dismissed'&&(!x.snoozed_until||new Date(x.snoozed_until)<=new Date())||st==='snoozed'&&x.snoozed_until&&new Date(x.snoozed_until)>new Date()||st===x.status)&&
+ (!q||[x.title,x.rule_name,x.summary,x.workstream].join(' ').toLowerCase().includes(q)))
+ .sort((a,b)=>Number(b.priority_score)-Number(a.priority_score)||new Date(a.first_detected_at)-new Date(b.first_detected_at));
+}
+function render(){
+ const list=filtered(),w=workstreams.find(x=>x.id===$('ainboxWorkstream').value);
+ $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
+ $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
+ $('ainboxHealth').textContent=w?.health_status||'Insufficient Data';
+ $('ainboxCount').textContent=list.length;$('ainboxHigh').textContent=list.filter(x=>Number(x.priority_score)>=70).length;
+ $('ainboxProgress').textContent=list.filter(x=>x.status==='in_progress').length;$('ainboxListCount').textContent=list.length+' results';
+ $('ainboxList').innerHTML=list.length?list.map(x=>`<button type="button" class="ainbox-item" data-id="${esc(x.id)}" aria-pressed="${x.id===selected}"><span class="top"><small>${esc(x.workstream)} · ${esc(x.rule_key)}</small><span class="ainbox-pill">${esc(x.status.replaceAll('_',' '))}</span></span><strong>${esc(x.title||x.rule_name)}</strong><p>${esc(x.summary||'A business rule requires attention.')}</p><small>Priority ${esc(x.priority_score)} · Detected ${esc(date(x.first_detected_at))}</small></button>`).join(''):'<div class="ainbox-empty">No exceptions match your filters. Check the last completed scan or adjust your filters.</div>';
+ $('ainboxList').querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.id;detailTab='remediation';render()}));
+ renderDetail(items.find(x=>x.id===selected));
+}
+function renderDetail(x){
+ const el=$('ainboxDetail');
+ if(!x){el.innerHTML='<h2>Choose an exception</h2><p>Review evidence, next steps and verification here.</p>';return}
+ const url=x.source_type==='work_board'?'/work-board/':x.source_type==='portfolio'?'/portfolio-management/':'/content-studio/';
+ el.innerHTML=`<div class="meta">${esc(x.workstream)} / ${esc(x.rule_key)}</div><h2>${esc(x.title||x.rule_name)}</h2><div class="meta">Priority ${esc(x.priority_score)} · ${esc(x.status)} · Last detected ${esc(date(x.last_detected_at))}</div><div class="section"><h3>Why this matters</h3><p>${esc(x.summary||'This item is outside the configured business rule.')}</p></div><div class="section"><h3>Next action</h3><p>${esc(x.next_action||'Open the source record and correct the condition.')}</p></div>
+ <div class="actions"><a href="${url}" class="ainbox-pill">Open source application</a><button type="button" id="ainboxProgressAction" ${x.status==='resolved'?'disabled':''}>Mark in progress</button><button type="button" id="ainboxSnooze" ${x.status==='resolved'?'disabled':''}>Snooze 1 day</button><button type="button" id="ainboxDismiss" ${x.status==='resolved'?'disabled':''}>Dismiss</button></div>
+ <div class="detail-tabs"><button data-detail="remediation" aria-selected="${detailTab==='remediation'}">Remediation</button><button data-detail="communication" aria-selected="${detailTab==='communication'}">Communication</button><button data-detail="activity" aria-selected="${detailTab==='activity'}">Activity</button></div>
+ <div id="ainboxDetailBody"></div>`;
+ $('ainboxProgressAction').onclick=()=>change(x,'in_progress');$('ainboxSnooze').onclick=()=>change(x,'snoozed',new Date(Date.now()+86400000).toISOString());$('ainboxDismiss').onclick=()=>change(x,'dismissed');
+ el.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>{detailTab=b.dataset.detail;renderDetail(x)});
+ $('ainboxDetailBody').innerHTML=detailTab==='remediation'?'<div class="section"><h3>Guided remediation</h3><p>Correct the issue in its source application. Completing a checklist is not compliance verification. A future scan must confirm resolution.</p></div>':detailTab==='communication'?'<div class="section"><h3>Communication</h3><p>Editable drafts and approval will be available once the secure communication RPCs are enabled. No messages are sent automatically.</p></div>':'<div class="section"><h3>Activity</h3><p>Detection, state changes and verification history are recorded by the server.</p></div>';
+}
+async function change(x,status,until){
+ try{await rpc('ainbox_set_exception_state',{p_tenant:tenant,p_id:x.id,p_status:status,p_revision:x.revision,p_snoozed_until:until||null});await load()}
+ catch(e){msg('Action failed: '+e.message)}
+}
+function setTab(v){
+ tab=v;document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.setAttribute('aria-selected',String(b.dataset.tab===v)));
+ $('ainboxWorkspace').hidden=v==='rules';$('ainboxRules').hidden=v!=='rules';$('ainboxScan').hidden=v!=='rules'||!allowedAdmin();
+ if(v==='rules')loadRules();else load();
+}
+async function loadRules(){
+ const el=$('ainboxRulesList');el.textContent='Loading rules…';
+ try{rules=await rpc('ainbox_get_rules',{p_tenant:tenant});el.innerHTML=rules.length?rules.map(r=>`<article><strong>${esc(r.rule_key)} · ${esc(r.name)}</strong><p>${esc(r.evaluator_type)} · ${r.enabled?'Enabled':'Disabled'} · Every ${esc(r.scan_interval_minutes)} minutes</p><button type="button" data-run="${esc(r.id)}" ${!r.enabled?'disabled':''}>Run now</button></article>`).join(''):'No rules configured yet.';
+ el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('Scan complete: '+JSON.stringify(res));await loadRules()}catch(e){msg('Scan failed: '+e.message)}finally{b.disabled=false}});
+ }catch(e){el.textContent='Rules are unavailable: '+e.message}
+}
+document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+['ainboxWorkstream','ainboxStatus','ainboxSearch'].forEach(id=>$(id).addEventListener(id==='ainboxSearch'?'input':'change',render));
+$('ainboxRefresh').onclick=()=>tab==='rules'?loadRules():load();
+$('ainboxScan').onclick=loadRules;
+App.onSession(async(s,p)=>{if(!s)return;user=p;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.');return}
+ document.querySelector('[data-tab="all"]').hidden=!allowedAdmin();document.querySelector('[data-tab="rules"]').hidden=!allowedAdmin();await load()});
+})();

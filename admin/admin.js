@@ -3,7 +3,7 @@
   'use strict';
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); Object.assign(n, props); n.append(...kids); return n; };
-  let me = null; let organizationsByUser=new Map();
+  let me = null; let organizationsByUser=new Map(), allOrganizations=[];
 
   const say = (t, err) => { const m = $('adminMsg'); m.textContent = t || ''; m.className = 'ap-msg' + (err ? ' err' : ''); };
 
@@ -26,12 +26,47 @@
   async function loadScopes() {
     const { data, error } = await App.sb.from('tenants').select('id,name,slug').order('name');
     if (error) throw error;
-    const select = $('adminScope');
+    allOrganizations=data||[]; const select = $('adminScope');
     for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); const g=document.createElement('option');g.value=t.id;g.textContent=t.name+' ('+t.slug+')';$('globalOrgFeatureTenant').append(g); const a=document.createElement('option'); a.value=t.id; a.textContent=t.name; $('assignOrganization').append(a); }
     select.addEventListener('change',()=>{ if(select.value!=='global') location.href='/tenant-admin/?tenant='+encodeURIComponent(select.value); });
   }
 
   const fmt = d => (d ? new Date(d).toLocaleString() : 'Never');
+
+  function organizationPicker(user) {
+    const memberships=organizationsByUser.get(user.id)||[];
+    const active=memberships.filter(m=>m.status==='active');
+    const td=el('td');
+    const details=el('details',{className:'org-membership-picker'});
+    const summary=el('summary',{textContent:active.length?active.map(m=>m.name).join(', '):'None'});
+    summary.title='Click to manage organization membership for '+user.email;
+    const panel=el('div',{className:'ap-panel'});
+    if(!allOrganizations.length)panel.append(el('span',{textContent:'No organizations available'}));
+    for(const org of allOrganizations){
+      const membership=memberships.find(m=>m.tenant_id===org.id);
+      const label=el('label',{className:'ap-row'});
+      const checkbox=el('input',{type:'checkbox',checked:membership?.status==='active'});
+      checkbox.addEventListener('change',async()=>{
+        const previous=!checkbox.checked;
+        checkbox.disabled=true;
+        try{
+          const {error}=await App.sb.rpc('global_set_user_organization',{p_user:user.id,p_tenant:org.id,p_active:checkbox.checked});
+          if(error)throw error;
+          const next=organizationsByUser.get(user.id)||[];
+          const remaining=next.filter(m=>m.tenant_id!==org.id);
+          remaining.push({tenant_id:org.id,name:org.name,status:checkbox.checked?'active':'inactive'});
+          organizationsByUser.set(user.id,remaining);
+          const names=remaining.filter(m=>m.status==='active').map(m=>m.name);
+          summary.textContent=names.length?names.join(', '):'None';
+          say((checkbox.checked?'Added ':'Removed ')+user.email+(checkbox.checked?' to ':' from ')+org.name);
+        }catch(err){checkbox.checked=previous;say(err.message,true);}
+        finally{checkbox.disabled=false;}
+      });
+      label.append(checkbox,document.createTextNode(' '+org.name));
+      panel.append(label);
+    }
+    details.append(summary,panel);td.append(details);return td;
+  }
 
   function render(users) {
     const body = $('userRows'); body.replaceChildren();
@@ -60,7 +95,7 @@
         el('td', { textContent: u.email || '' }),
         el('td', { textContent: u.full_name || '' }),
         el('td', {}, el('span', { className: 'ap-tag' + (u.is_admin ? '' : ' dim'), textContent: u.is_admin ? 'Admin' : u.is_superuser ? 'Superuser' : 'User' })),
-        el('td', { textContent: (organizationsByUser.get(u.id)||[]).join(', ') || 'None' }),
+        organizationPicker(u),
         el('td', {}, status),
         el('td', { textContent: u.owned + ' owned, ' + u.shared + ' shared' }),
         el('td', { textContent: fmt(u.last_seen_at) }),
@@ -71,12 +106,12 @@
   async function load() {
     say('Loading...');
     try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));
-      const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,status,tenants(name)').order('created_at');
+      const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,tenant_id,status,tenants(name)').order('created_at');
       if(membershipError)throw membershipError;
       organizationsByUser=new Map();
       for(const m of membershipData||[]){
         const a=organizationsByUser.get(m.user_id)||[];
-        a.push((m.tenants?.name||'Unknown')+(m.status==='active'?'':' (inactive)'));
+        a.push({tenant_id:m.tenant_id,name:m.tenants?.name||'Unknown',status:m.status});
         organizationsByUser.set(m.user_id,a);
       }
       users.forEach(u=>u.is_content_creator=!!roleMap.get(u.id));render(users); say(users.length + ' users'); }

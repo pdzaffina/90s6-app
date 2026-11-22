@@ -5,6 +5,31 @@ if(!form)return;
 const say=(message,error=false)=>{status.textContent=message;status.className='ap-msg'+(error?' err':'');};
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data;};
 let allowed=false;
+$('globalAiTest').onclick=async()=>{
+ if(!allowed)return;
+ const button=$('globalAiTest'),output=$('globalAiTestResult');
+ button.disabled=true;output.textContent='Testing saved model with a minimal request (up to 60 seconds)…';
+ try{
+  const {data,error}=await App.sb.functions.invoke('ainbox-ai-diagnostic',{body:{}});
+  if(error){let message=error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
+  if(data?.error)throw Error(data.error);
+  const fmt=ms=>ms===null||ms===undefined?'not reached':(ms/1000).toFixed(3)+' seconds';
+  output.textContent=[
+   'Model: '+data.model,
+   'HTTP status: '+(data.http_status??'no provider response'),
+   'Time to response headers: '+fmt(data.headers_ms),
+   'Time to complete response: '+fmt(data.body_ms??data.elapsed_ms),
+   'Visible text returned: '+(data.visible_text===undefined?'unknown':data.visible_text?'yes':'no'),
+   'Finish reason: '+(data.finish_reason??'not provided'),
+   'Completion tokens: '+(data.completion_tokens??'not provided'),
+   'Reasoning tokens: '+(data.reasoning_tokens??'not provided'),
+   'Timed out: '+(data.timed_out?'yes':'no'),
+   'Error type: '+(data.error_type??data.provider_error_type??'none')
+  ].join('\n');
+ }catch(e){output.textContent='Diagnostic failed: '+e.message}
+ finally{button.disabled=false}
+};
+
 async function refreshModels(selected){
  const picker=$('globalAiModel'),button=$('globalAiRefreshModels');
  button.disabled=true;picker.disabled=true;say('Loading models from NVIDIA…');

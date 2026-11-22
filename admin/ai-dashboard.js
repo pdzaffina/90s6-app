@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data};
 const money=v=>'$'+Number(v||0).toFixed(4);
-let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};
+let auditRows=[];let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};
 async function load(){
  if(!authorized)return;
  $('error').textContent='';
@@ -26,6 +26,17 @@ async function load(){
 async function loadAudit(){
  const rows=await rpc('ai_audit_search',{p_limit:200,p_component:$('auditComponent').value||null,p_model:$('auditModel').value.trim()||null,p_status:$('auditStatus').value||null,p_query:$('auditSearch').value.trim()||null,p_since:null});
  $('auditExplorerStatus').textContent=rows.length+' matching requests (up to 200 displayed)';
+ auditRows=rows;
+ const picker=$('evalSource'),previous=picker.value;picker.replaceChildren();
+ const prompt=document.createElement('option');prompt.value='';prompt.textContent='Choose an audited request...';picker.append(prompt);
+ for(const item of rows){
+  const option=document.createElement('option');option.value=item.usage_id;
+  option.textContent=new Date(item.request_at).toLocaleString()+' · '+item.component_key+' · '+item.model+' · '+item.usage_id.slice(0,8);
+  picker.append(option);
+ }
+ if(rows.some(item=>item.usage_id===previous))picker.value=previous;
+ if(!picker.value)$('evalSelection').textContent=rows.length?'Select an audited request to populate the evaluation.':'No audited requests available yet.';
+
  const selected=$('auditComponent').value;
  const components=[...new Set(rows.map(r=>r.component_key))];
  for(const c of components){if(!$('auditComponent').querySelector('option[value="'+c+'"]')){const option=document.createElement('option');option.value=c;option.textContent=c;$('auditComponent').append(option)}}
@@ -48,9 +59,18 @@ async function loadAudit(){
     $('auditResponse').textContent=detail.response_payload==null?'No provider response recorded':JSON.stringify(detail.response_payload,null,2);
     $('auditDetail').hidden=false;$('auditDetail').scrollIntoView({behavior:'smooth',block:'nearest'});
    }catch(e){$('error').textContent='Could not inspect audit: '+e.message}finally{button.disabled=false}
-  };const replay=document.createElement('button');replay.textContent='Replay';replay.style.marginLeft='5px';replay.onclick=()=>{ $('evalSource').value=a.usage_id;$('evalModelA').value=a.model;$('evalModelB').focus();$('evalSource').scrollIntoView({behavior:'smooth',block:'center'});};cell.append(button,replay);tr.append(cell);tbody.append(tr)
+  };const evaluate=document.createElement('button');evaluate.textContent='Evaluate';evaluate.style.marginLeft='5px';evaluate.onclick=()=>{selectEvaluation(a.usage_id);document.getElementById('evaluationWorkbench').scrollIntoView({behavior:'smooth',block:'start'});};cell.append(button,evaluate);tr.append(cell);tbody.append(tr)
  }
 }
+function selectEvaluation(id){
+ const item=auditRows.find(row=>row.usage_id===id);
+ $('evalSource').value=item?.usage_id||'';
+ if(!item){$('evalSelection').textContent='Choose an audited request.';return}
+ $('evalModelA').value=item.model;
+ $('evalSelection').textContent='Selected '+new Date(item.request_at).toLocaleString()+' · '+item.component_key+' · '+item.model+' · '+item.usage_id;
+ $('evalStatus').textContent='';
+}
+$('evalSource').onchange=()=>selectEvaluation($('evalSource').value);
 $('auditFilter').onclick=()=>loadAudit().catch(e=>$('auditExplorerStatus').textContent=e.message);
 $('auditExport').onclick=async()=>{
  const button=$('auditExport');button.disabled=true;

@@ -23,7 +23,154 @@ begin
      for item in select value from jsonb_array_elements(b.data) loop
        source_id:=item->>'id';if source_id is null or source_id='' then unknowns:=unknowns+1;continue;end if;
        if nullif(item->>'due','') is null then
-         perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,'Compliant','{}'::jsonb,b.owner_id,0);
+         perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,'Compliant','{}'::jsonb,coalesce((select m.user_id from public.tenant_members m join public.profiles p on p.id=m.user_id where m.tenant_id=p_tenant and m.status='active' and not p.disabled and m.user_id=case when item->>'owner_id' ~ '^[0-9a-f-]{36}
+         continue;
+       end if;
+       begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;
+       if jsonb_typeof(board_columns)<>'array' or nullif(item->>'column_id','') is null then unknowns:=unknowns+1;continue;end if;
+       col_id:=item->>'column_id';col:=null;
+       select value into col from jsonb_array_elements(board_columns) where value->>'id'=col_id limit 1;
+       if col is null then unknowns:=unknowns+1;continue;end if;
+       complete:=coalesce((col->>'is_completion')::boolean,false);
+       outcome:=case when not complete and due_date<today_local then 'Violation' else 'Compliant' end;
+       total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+       evidence:=jsonb_build_object('title',left(coalesce(item->>'title','Work item'),140),'summary','Due '||due_date::text||' and not in a completion column','next_action','Complete the work item or set a valid future due date','due',due_date);
+       perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,outcome,evidence,coalesce((select m.user_id from public.tenant_members m join public.profiles p on p.id=m.user_id where m.tenant_id=p_tenant and m.status='active' and not p.disabled and m.user_id=case when item->>'owner_id' ~ '^[0-9a-f-]{36} then 65 else 0 end);
+     end loop;
+   end loop;
+ elsif r.evaluator_type='KB-002' then
+   threshold_days:=(cfg->>'threshold_days')::integer;
+   for article in select id,title,status,archived_at,draft_entered_at,created_by from public.knowledge_articles
+     where tenant_id=p_tenant and content_scope='tenant' loop
+     if article.archived_at is not null or article.status<>'draft' then outcome:='Compliant';
+     elsif article.draft_entered_at is null then outcome:='Unknown';
+     elsif article.draft_entered_at < now()-make_interval(days=>threshold_days) then outcome:='Violation';
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(article.title,140),'summary','Knowledge article draft exceeds '||threshold_days||' calendar days','next_action','Publish, archive, or move the article out of Draft');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'knowledge_base','',article.id::text,outcome,evidence,article.created_by,case when outcome='Violation' then 55 else 0 end);
+   end loop;
+ elsif r.evaluator_type='PORT-003' then
+   active_statuses:=cfg->'active_statuses';
+   for initiative in select i.id,i.title,i.status,i.agreed_rank,i.assessment_completed_at,i.portfolio_id
+     from public.pm_initiatives i join public.pm_portfolios p on p.id=i.portfolio_id where p.tenant_id=p_tenant loop
+     if initiative.status is null then outcome:='Unknown';
+     elsif active_statuses ? initiative.status then
+       outcome:=case when initiative.assessment_completed_at is null or initiative.agreed_rank is null then 'Violation' else 'Compliant' end;
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(initiative.title,140),'summary',
+       case when initiative.assessment_completed_at is null and initiative.agreed_rank is null then 'Assessment and agreed rank missing'
+       when initiative.assessment_completed_at is null then 'Assessment incomplete' else 'Agreed rank missing' end,
+       'next_action','Complete the assessment and establish an agreed rank');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'portfolio',initiative.portfolio_id::text,initiative.id::text,outcome,evidence,work_owner,case when outcome='Violation' then 70 else 0 end);
+   end loop;
+ else raise exception 'Unknown evaluator';end if;
+ update public.ainbox_scan_runs set status='succeeded',completed_at=now(),lease_expires_at=null,
+ evaluated_count=total,violation_count=violations,unknown_count=unknowns,
+ coverage=jsonb_build_object('method','explicit_record_evaluation','evaluated',total,'unknown',unknowns) where id=run_id;
+ update public.ainbox_rules set last_success_at=now(),next_scan_at=now()+make_interval(mins=>r.scan_interval_minutes),updated_at=now() where id=p_rule;
+ return jsonb_build_object('scan_run_id',run_id,'evaluated',total,'violations',violations,'unknown',unknowns);
+end $$;
+revoke all on function public.ainbox_run_rule(uuid,uuid) from public,anon;
+grant execute on function public.ainbox_run_rule(uuid,uuid) to authenticated;
+commit; then (item->>'owner_id')::uuid else null end),work_owner),0);
+         continue;
+       end if;
+       begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;
+       if jsonb_typeof(board_columns)<>'array' or nullif(item->>'column_id','') is null then unknowns:=unknowns+1;continue;end if;
+       col_id:=item->>'column_id';col:=null;
+       select value into col from jsonb_array_elements(board_columns) where value->>'id'=col_id limit 1;
+       if col is null then unknowns:=unknowns+1;continue;end if;
+       complete:=coalesce((col->>'is_completion')::boolean,false);
+       outcome:=case when not complete and due_date<today_local then 'Violation' else 'Compliant' end;
+       total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+       evidence:=jsonb_build_object('title',left(coalesce(item->>'title','Work item'),140),'summary','Due '||due_date::text||' and not in a completion column','next_action','Complete the work item or set a valid future due date','due',due_date);
+       perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'work_board',b.id::text,source_id,outcome,evidence,b.owner_id,case when outcome='Violation' then 65 else 0 end);
+     end loop;
+   end loop;
+ elsif r.evaluator_type='KB-002' then
+   threshold_days:=(cfg->>'threshold_days')::integer;
+   for article in select id,title,status,archived_at,draft_entered_at,created_by from public.knowledge_articles
+     where tenant_id=p_tenant and content_scope='tenant' loop
+     if article.archived_at is not null or article.status<>'draft' then outcome:='Compliant';
+     elsif article.draft_entered_at is null then outcome:='Unknown';
+     elsif article.draft_entered_at < now()-make_interval(days=>threshold_days) then outcome:='Violation';
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(article.title,140),'summary','Knowledge article draft exceeds '||threshold_days||' calendar days','next_action','Publish, archive, or move the article out of Draft');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'knowledge_base','',article.id::text,outcome,evidence,article.created_by,case when outcome='Violation' then 55 else 0 end);
+   end loop;
+ elsif r.evaluator_type='PORT-003' then
+   active_statuses:=cfg->'active_statuses';
+   for initiative in select i.id,i.title,i.status,i.agreed_rank,i.assessment_completed_at,i.portfolio_id
+     from public.pm_initiatives i join public.pm_portfolios p on p.id=i.portfolio_id where p.tenant_id=p_tenant loop
+     if initiative.status is null then outcome:='Unknown';
+     elsif active_statuses ? initiative.status then
+       outcome:=case when initiative.assessment_completed_at is null or initiative.agreed_rank is null then 'Violation' else 'Compliant' end;
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(initiative.title,140),'summary',
+       case when initiative.assessment_completed_at is null and initiative.agreed_rank is null then 'Assessment and agreed rank missing'
+       when initiative.assessment_completed_at is null then 'Assessment incomplete' else 'Agreed rank missing' end,
+       'next_action','Complete the assessment and establish an agreed rank');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'portfolio',initiative.portfolio_id::text,initiative.id::text,outcome,evidence,work_owner,case when outcome='Violation' then 70 else 0 end);
+   end loop;
+ else raise exception 'Unknown evaluator';end if;
+ update public.ainbox_scan_runs set status='succeeded',completed_at=now(),lease_expires_at=null,
+ evaluated_count=total,violation_count=violations,unknown_count=unknowns,
+ coverage=jsonb_build_object('method','explicit_record_evaluation','evaluated',total,'unknown',unknowns) where id=run_id;
+ update public.ainbox_rules set last_success_at=now(),next_scan_at=now()+make_interval(mins=>r.scan_interval_minutes),updated_at=now() where id=p_rule;
+ return jsonb_build_object('scan_run_id',run_id,'evaluated',total,'violations',violations,'unknown',unknowns);
+end $$;
+revoke all on function public.ainbox_run_rule(uuid,uuid) from public,anon;
+grant execute on function public.ainbox_run_rule(uuid,uuid) to authenticated;
+commit; then (item->>'owner_id')::uuid else null end),work_owner),case when outcome='Violation' then 65 else 0 end);
+     end loop;
+   end loop;
+ elsif r.evaluator_type='KB-002' then
+   threshold_days:=(cfg->>'threshold_days')::integer;
+   for article in select id,title,status,archived_at,draft_entered_at,created_by from public.knowledge_articles
+     where tenant_id=p_tenant and content_scope='tenant' loop
+     if article.archived_at is not null or article.status<>'draft' then outcome:='Compliant';
+     elsif article.draft_entered_at is null then outcome:='Unknown';
+     elsif article.draft_entered_at < now()-make_interval(days=>threshold_days) then outcome:='Violation';
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(article.title,140),'summary','Knowledge article draft exceeds '||threshold_days||' calendar days','next_action','Publish, archive, or move the article out of Draft');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'knowledge_base','',article.id::text,outcome,evidence,article.created_by,case when outcome='Violation' then 55 else 0 end);
+   end loop;
+ elsif r.evaluator_type='PORT-003' then
+   active_statuses:=cfg->'active_statuses';
+   for initiative in select i.id,i.title,i.status,i.agreed_rank,i.assessment_completed_at,i.portfolio_id
+     from public.pm_initiatives i join public.pm_portfolios p on p.id=i.portfolio_id where p.tenant_id=p_tenant loop
+     if initiative.status is null then outcome:='Unknown';
+     elsif active_statuses ? initiative.status then
+       outcome:=case when initiative.assessment_completed_at is null or initiative.agreed_rank is null then 'Violation' else 'Compliant' end;
+     else outcome:='Compliant';end if;
+     if outcome='Unknown' then unknowns:=unknowns+1;continue;end if;
+     total:=total+1;if outcome='Violation' then violations:=violations+1;end if;
+     evidence:=jsonb_build_object('title',left(initiative.title,140),'summary',
+       case when initiative.assessment_completed_at is null and initiative.agreed_rank is null then 'Assessment and agreed rank missing'
+       when initiative.assessment_completed_at is null then 'Assessment incomplete' else 'Agreed rank missing' end,
+       'next_action','Complete the assessment and establish an agreed rank');
+     perform ainbox_internal.record_result(p_tenant,run_id,r.id,r.current_version_id,r.workstream_id,'portfolio',initiative.portfolio_id::text,initiative.id::text,outcome,evidence,work_owner,case when outcome='Violation' then 70 else 0 end);
+   end loop;
+ else raise exception 'Unknown evaluator';end if;
+ update public.ainbox_scan_runs set status='succeeded',completed_at=now(),lease_expires_at=null,
+ evaluated_count=total,violation_count=violations,unknown_count=unknowns,
+ coverage=jsonb_build_object('method','explicit_record_evaluation','evaluated',total,'unknown',unknowns) where id=run_id;
+ update public.ainbox_rules set last_success_at=now(),next_scan_at=now()+make_interval(mins=>r.scan_interval_minutes),updated_at=now() where id=p_rule;
+ return jsonb_build_object('scan_run_id',run_id,'evaluated',total,'violations',violations,'unknown',unknowns);
+end $$;
+revoke all on function public.ainbox_run_rule(uuid,uuid) from public,anon;
+grant execute on function public.ainbox_run_rule(uuid,uuid) to authenticated;
+commit; then (item->>'owner_id')::uuid else null end),work_owner),0);
          continue;
        end if;
        begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;

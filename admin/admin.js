@@ -23,6 +23,14 @@
     catch (e) { say(e.message, true); }
   }
 
+  async function loadScopes() {
+    const { data, error } = await App.sb.from('tenants').select('id,name,slug').order('name');
+    if (error) throw error;
+    const select = $('adminScope');
+    for (const t of data || []) { const o=document.createElement('option'); o.value=t.id; o.textContent=t.name+' ('+t.slug+')'; select.append(o); }
+    select.addEventListener('change',()=>{ if(select.value!=='global') location.href='/tenant-admin/?tenant='+encodeURIComponent(select.value); });
+  }
+
   const fmt = d => (d ? new Date(d).toLocaleString() : 'Never');
 
   function render(users) {
@@ -107,10 +115,11 @@
   $('bulkTemplate').addEventListener('click', () => {
     // Three short sample rows show all roles and both active values.
     const csv = [
-      'email,full_name,password,role,active',
-      'new.user@example.com,Example User,ChangeMe2026!user,user,Y',
-      'new.superuser@example.com,Example Superuser,ChangeMe2026!super,superuser,N',
-      'new.admin@example.com,Example Admin,ChangeMe2026!admin,admin,Y'
+      'email,full_name,password,role,active,organization',
+      'new.user@example.com,Example User,ChangeMe2026!user,user,Y,90s6',
+      'new.superuser@example.com,Example Superuser,ChangeMe2026!super,superuser,N,90s6',
+      'new.tenantadmin@example.com,Example Tenant Admin,ChangeMe2026!tenant,tenant_admin,Y,90s6',
+      'new.admin@example.com,Example Global Admin,ChangeMe2026!admin,admin,Y,global'
     ].join('\r\n') + '\r\n';
     const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
     const a = el('a', { href: url, download: '90s6-bulk-users-template.csv' });
@@ -125,7 +134,7 @@
       if (file.size > 256 * 1024) throw new Error('CSV must be under 256 KB.');
       const rows = parseCsv((await file.text()).replace(/^\uFEFF/, ''));
       const header = (rows.shift() || []).map(x => x.trim().toLowerCase());
-      for (const name of ['email', 'full_name', 'password', 'role', 'active']) {
+      for (const name of ['email', 'full_name', 'password', 'role', 'active', 'organization']) {
         if (!header.includes(name)) throw new Error('Missing CSV column: ' + name);
       }
       if (rows.length < 1 || rows.length > 100) throw new Error('Upload 1 to 100 users per batch.');
@@ -134,17 +143,18 @@
         if (values.length !== header.length) throw new Error('Wrong number of columns on data row ' + (i + 2));
         const u = Object.fromEntries(header.map((key, j) => [key, values[j]]));
         u.email = u.email.trim().toLowerCase();
-        u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase(); u.active = u.active.trim().toUpperCase();
+        u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase(); u.active = u.active.trim().toUpperCase(); u.organization = u.organization.trim().toLowerCase();
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) throw new Error('Invalid email on row ' + (i + 2));
-        if (seen.has(u.email)) throw new Error('Duplicate email on row ' + (i + 2));
-        if (!['user', 'superuser', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
+        if (seen.has(u.email+':'+u.organization)) throw new Error('Duplicate email on row ' + (i + 2));
+        if (!['user', 'superuser', 'tenant_admin', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
         if (!['Y', 'N'].includes(u.active)) throw new Error('Active must be Y or N on row ' + (i + 2));
         if (u.password && u.password.length < 12) throw new Error('Password must be at least 12 characters when supplied on row ' + (i + 2));
-        seen.add(u.email); return u;
+        if (!u.organization || (u.organization === 'global' && u.role !== 'admin') || (u.organization !== 'global' && u.role === 'admin')) throw new Error('Invalid organization and role combination on row '+(i+2));
+        seen.add(u.email+':'+u.organization); return u;
       });
       bulkUsers.forEach(u => $('bulkRows').append(el('tr', {},
         el('td', { textContent: u.email }), el('td', { textContent: u.full_name }),
-        el('td', { textContent: u.role }), el('td', { textContent: u.active }), el('td', { textContent: 'Ready' }))));
+        el('td', { textContent: u.role }), el('td', { textContent: u.active }), el('td', { textContent: u.organization }), el('td', { textContent: 'Ready' }))));
       $('bulkPreview').hidden = false; $('bulkCreate').disabled = false;
       bulkSay(bulkUsers.length + ' users ready. Review before applying.');
     } catch (err) { bulkUsers = []; bulkSay(err.message, true); }
@@ -159,7 +169,7 @@
       (results || []).forEach((r, i) => {
         const status = r.status === 'created' ? 'Created' : r.status === 'updated' ? 'Updated' : r.status === 'skipped' ? 'Skipped' : 'Failed';
         if (r.status === 'created') success++; else if (r.status === 'updated') updated++; else if (r.status === 'skipped') skipped++; else failed++;
-        $('bulkRows').rows[i].cells[4].textContent = status + (r.error ? ': ' + r.error : '');
+        $('bulkRows').rows[i].cells[5].textContent = status + (r.error ? ': ' + r.error : '');
       });
       bulkSay(success + ' created, ' + updated + ' updated, ' + skipped + ' skipped, ' + failed + ' failed.');
       bulkUsers = []; $('bulkCsv').value = '';
@@ -201,6 +211,6 @@
     if (!session) return;
     const ok = !!profile.is_admin;
     $('denied').hidden = ok; $('adminBody').hidden = !ok;
-    if (ok) { me = session.user; load(); loadAudit(true); }
+    if (ok) { me = session.user; loadScopes().catch(e=>say(e.message,true)); load(); loadAudit(true); }
   });
 })();

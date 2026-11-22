@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id),sb=App.sb;
 let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const msg=s=>{$('ainboxMessage').textContent=s||''};
+const msg=(message,type='info')=>{const el=$('ainboxMessage');if(!el)return;el.textContent=message||'';el.hidden=!message;el.className='ainbox-message ainbox-message--'+(message?type:'info');el.setAttribute('role',type==='error'?'alert':'status');};
 const date=s=>s?new Date(s).toLocaleString():'Not yet';
 const allowedAdmin=()=>role==='superuser'||role==='tenant_admin'||!!user?.is_admin;
 const rpc=async(name,args)=>{const {data,error}=await sb.rpc(name,args);if(error)throw Error(error.message);return data};
@@ -15,7 +15,7 @@ async function load(){
   const sel=$('ainboxWorkstream'),old=sel.value;sel.replaceChildren(new Option('All workstreams',''),...workstreams.map(x=>new Option(x.name,x.id)));sel.value=workstreams.some(x=>x.id===old)?old:'';
   if(!items.some(x=>x.id===selected))selected=items[0]?.id||null;
   msg('');render();
- }catch(e){msg('Could not load Action Inbox: '+e.message);items=[];render()}
+ }catch(e){msg('Could not load Action Inbox: '+e.message,'error');items=[];render()}
 }
 function filtered(){
  const w=$('ainboxWorkstream').value,st=$('ainboxStatus').value,q=$('ainboxSearch').value.trim().toLowerCase();
@@ -55,12 +55,12 @@ async function renderDetail(x){
   const steps=plan?.steps||[];
   body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. Completing steps does not resolve the exception until a verified scan confirms compliance.</p><p>Plan status: <strong>'+esc(plan?.status||'Not created')+'</strong></p><label>Remediation steps (one per line)<textarea id="ainboxSteps" rows="5" maxlength="10000" placeholder="Describe the steps to restore compliance"></textarea></label><div class="actions"><button type="button" id="ainboxSavePlan">Save plan</button><button type="button" id="ainboxApprovePlan">Approve plan</button></div><div id="ainboxStepChecklist"></div></div>';
   $('ainboxSteps').value=steps.map(z=>z.description).join('\n');
-  $('ainboxSavePlan').onclick=async()=>{try{const values=$('ainboxSteps').value.split('\n').map(t=>t.trim()).filter(Boolean);await rpc('ainbox_save_remediation',{p_tenant:tenant,p_exception:x.id,p_steps:values});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxSavePlan').onclick=async()=>{try{const values=$('ainboxSteps').value.split('\n').map(t=>t.trim()).filter(Boolean);await rpc('ainbox_save_remediation',{p_tenant:tenant,p_exception:x.id,p_steps:values});renderDetail(x)}catch(e){msg(e.message,'error')}};
   $('ainboxApprovePlan').disabled=!allowedAdmin()||!plan||plan.status!=='proposed';
-  $('ainboxApprovePlan').onclick=async()=>{try{await rpc('ainbox_approve_remediation',{p_tenant:tenant,p_plan:plan.id,p_revision:plan.revision});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxApprovePlan').onclick=async()=>{try{await rpc('ainbox_approve_remediation',{p_tenant:tenant,p_plan:plan.id,p_revision:plan.revision});renderDetail(x)}catch(e){msg(e.message,'error')}};
   const checklist=$('ainboxStepChecklist');
   checklist.innerHTML=steps.map(z=>'<label class="ainbox-check"><input type="checkbox" data-step="'+esc(z.id)+'" '+(z.completed_at?'checked':'')+' '+(!['approved','in_progress','completed'].includes(plan.status)?'disabled':'')+'><span>'+esc(z.description)+'</span></label>').join('');
-  checklist.querySelectorAll('[data-step]').forEach(input=>input.onchange=async()=>{try{await rpc('ainbox_complete_remediation_step',{p_tenant:tenant,p_step:input.dataset.step,p_completed:input.checked});renderDetail(x)}catch(e){msg(e.message);renderDetail(x)}});
+  checklist.querySelectorAll('[data-step]').forEach(input=>input.onchange=async()=>{try{await rpc('ainbox_complete_remediation_step',{p_tenant:tenant,p_step:input.dataset.step,p_completed:input.checked});renderDetail(x)}catch(e){msg(e.message,'error');renderDetail(x)}});
   
  }else if(detailTab==='activity'){
   body.innerHTML='<div class="section"><h3>Activity history</h3>'+(detail.activity||[]).map(a=>'<p>'+esc(a.event_type.replaceAll('_',' '))+' · '+esc(date(a.occurred_at))+'</p>').join('')+'</div>';
@@ -69,17 +69,17 @@ async function renderDetail(x){
   body.innerHTML='<div class="section"><h3>Communication draft</h3><label>Recipient<input id="ainboxRecipient" maxlength="500"></label><label>Subject<input id="ainboxSubject" maxlength="300"></label><label>Message<textarea id="ainboxBody" maxlength="20000"></textarea></label><div class="actions"><button type="button" id="ainboxSaveComm">Save draft</button><button type="button" id="ainboxApproveComm">Approve</button><button type="button" id="ainboxRecordComm">Record delivery</button></div><p id="ainboxCommStatus"></p><small>Approval and recording delivery are separate. No automatic messages are sent.</small></div>';
   $('ainboxRecipient').value=c.recipient||'';$('ainboxSubject').value=c.subject||'';$('ainboxBody').value=c.body||'';
   $('ainboxCommStatus').textContent=c.status||'New draft';
-  $('ainboxSaveComm').onclick=async()=>{try{await rpc('ainbox_save_communication',{p_tenant:tenant,p_exception:x.id,p_recipient:$('ainboxRecipient').value,p_subject:$('ainboxSubject').value,p_body:$('ainboxBody').value});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxSaveComm').onclick=async()=>{try{await rpc('ainbox_save_communication',{p_tenant:tenant,p_exception:x.id,p_recipient:$('ainboxRecipient').value,p_subject:$('ainboxSubject').value,p_body:$('ainboxBody').value});renderDetail(x)}catch(e){msg(e.message,'error')}};
   $('ainboxApproveComm').disabled=!allowedAdmin()||!c.id||c.status!=='draft';
-  $('ainboxApproveComm').onclick=async()=>{try{await rpc('ainbox_approve_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxApproveComm').onclick=async()=>{try{await rpc('ainbox_approve_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version});renderDetail(x)}catch(e){msg(e.message,'error')}};
   $('ainboxRecordComm').disabled=!c.id||c.status!=='approved';
-  $('ainboxRecordComm').onclick=async()=>{const channel=prompt('Delivery channel: email, chat, phone, meeting, other','email');if(channel===null)return;const reference=prompt('Delivery reference or note (optional)','');if(reference===null)return;try{await rpc('ainbox_record_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version,p_channel:channel,p_reference:reference});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxRecordComm').onclick=async()=>{const channel=prompt('Delivery channel: email, chat, phone, meeting, other','email');if(channel===null)return;const reference=prompt('Delivery reference or note (optional)','');if(reference===null)return;try{await rpc('ainbox_record_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version,p_channel:channel,p_reference:reference});renderDetail(x)}catch(e){msg(e.message,'error')}};
  }
  }catch(e){body.textContent='Could not load details: '+e.message}
 }
 async function change(x,status,until){
  try{await rpc('ainbox_set_exception_state',{p_tenant:tenant,p_id:x.id,p_status:status,p_revision:x.revision,p_snoozed_until:until||null});await load()}
- catch(e){msg('Action failed: '+e.message)}
+ catch(e){msg('Action failed: '+e.message,'error')}
 }
 function showScanResult(res,rule){const unknown=Number(res?.unknown||0),evaluated=Number(res?.evaluated||0),violations=Number(res?.violations||0);const box=$('ainboxScanResult');if(!box)return;box.hidden=false;box.className='ainbox-scan-result'+(unknown?' ainbox-scan-warning':'');box.innerHTML='<strong>'+esc(rule?.rule_key||'Rule')+' scan completed</strong><p>'+evaluated+' evaluated · '+violations+' violations · '+unknown+' unknown</p>'+(unknown?'<p><strong>Action needed:</strong> Some records lack information required for a reliable result. '+(rule?.rule_key==='WORK-001'?'In Work Boards, edit each item and set its status to To Do, In Progress, or Done. An overdue item remains an exception until its status is Done or its due date is moved into the future.':rule?.rule_key==='KB-002'?'Older drafts without a reliable Draft entry date remain Unknown until an authoritative baseline exists.':'Review missing assessment or source status information.')+'</p>':'<p>All records in this scan were classified.</p>');}
 function setTab(v){
@@ -137,7 +137,7 @@ function openRuleEditor(rule){
   const save=$('ainboxRuleSave');save.disabled=true;save.textContent='Saving…';
   try{
    await rpc('ainbox_configure_rule',{p_tenant:tenant,p_rule:rule.id,p_enabled:form.elements.enabled.checked,p_interval:interval,p_config:next});
-   close();await loadRules();msg('Saved '+rule.rule_key+' configuration.');
+   close();await loadRules();msg('Saved '+rule.rule_key+' configuration.','success');
   }catch(e){error.textContent='Could not save: '+e.message;error.hidden=false;save.disabled=false;save.textContent='Save changes'}
  };
  panel.scrollIntoView({behavior:'smooth',block:'nearest'});
@@ -145,15 +145,15 @@ function openRuleEditor(rule){
 async function loadRules(){
  const el=$('ainboxRulesList');el.textContent='Loading rules…';
  try{rules=await rpc('ainbox_get_rules',{p_tenant:tenant});el.innerHTML=rules.length?rules.map(r=>`<article><strong>${esc(r.rule_key)} · ${esc(r.name)}</strong><p>${esc(r.evaluator_type)} · ${r.enabled?'Enabled':'Disabled'} · Every ${esc(r.scan_interval_minutes)} minutes</p><div class="ainbox-rule-buttons"><button type="button" class="ainbox-rule-run" data-run="${esc(r.id)}" ${!r.enabled?'disabled':''}><span aria-hidden="true">▶</span> Run now</button><button type="button" class="ainbox-rule-config" data-config="${esc(r.id)}"><span aria-hidden="true">⚙</span> Configure</button></div></article>`).join('') :'<p>No rules configured. Initialize the three standard rules to begin.</p><button type="button" id="ainboxBootstrap">Initialize rules</button>';
- const boot=$('ainboxBootstrap');if(boot)boot.onclick=async()=>{boot.disabled=true;try{await rpc('ainbox_bootstrap',{p_tenant:tenant,p_owner:user.id});await loadRules()}catch(e){msg(e.message)}finally{boot.disabled=false}};
+ const boot=$('ainboxBootstrap');if(boot)boot.onclick=async()=>{boot.disabled=true;try{await rpc('ainbox_bootstrap',{p_tenant:tenant,p_owner:user.id});await loadRules()}catch(e){msg(e.message,'error')}finally{boot.disabled=false}};
  el.querySelectorAll('[data-config]').forEach(b=>b.onclick=()=>openRuleEditor(rules.find(x=>x.id===b.dataset.config)));
- el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('');showScanResult(res,rules.find(x=>x.id===b.dataset.run));await loadRules()}catch(e){msg('Scan failed: '+e.message)}finally{b.disabled=false}});
+ el.querySelectorAll('[data-run]').forEach(b=>b.onclick=async()=>{b.disabled=true;try{const res=await rpc('ainbox_run_rule',{p_tenant:tenant,p_rule:b.dataset.run});msg('');showScanResult(res,rules.find(x=>x.id===b.dataset.run));await loadRules()}catch(e){msg('Scan failed: '+e.message,'error')}finally{b.disabled=false}});
  }catch(e){el.textContent='Rules are unavailable: '+e.message}
 }
 document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 ['ainboxWorkstream','ainboxStatus','ainboxSearch'].forEach(id=>$(id).addEventListener(id==='ainboxSearch'?'input':'change',render));
 $('ainboxRefresh').onclick=()=>tab==='rules'?loadRules():load();
 $('ainboxScan').onclick=loadRules;
-App.onSession(async(s,p)=>{if(!s)return;user=p;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.');return}
+App.onSession(async(s,p)=>{if(!s)return;user=p;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.','warning');return}
  document.querySelector('[data-tab="all"]').hidden=!allowedAdmin();document.querySelector('[data-tab="rules"]').hidden=!allowedAdmin();await load()});
 })();

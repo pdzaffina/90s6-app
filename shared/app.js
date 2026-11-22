@@ -12,7 +12,7 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = ''; let tenantMemberships = [], activeTenantId = null; let features = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || features[k] !== false;
+  let session = null, profile = null, state = 'unknown', notice = ''; let tenantMemberships = [], activeTenantId = null; let features = {}, organizationFeatures = {}, tenantUserFeatures = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || (features[k] !== false && organizationFeatures[k] !== false && tenantUserFeatures[k] !== false);
 
   const tenantRole = (id = activeTenantId) => tenantMemberships.find(m => m.tenant_id === id)?.role || null;
   const isTenantAdmin = (id = activeTenantId) => !!profile?.is_admin || tenantRole(id) === 'tenant_admin';
@@ -108,7 +108,15 @@
     const preferred = sessionStorage.getItem('90s6-active-tenant:' + s.user.id);
     activeTenantId = tenantMemberships.some(m => m.tenant_id === preferred) ? preferred : tenantMemberships[0]?.tenant_id || null;
     if (!activeTenantId && !profile.is_admin) { notice='No active organization membership. Contact your administrator.'; session=null; await sb.auth.signOut(); return; }
-    const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled); state = 'in';
+    const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled);
+    organizationFeatures={};tenantUserFeatures={};
+    if(activeTenantId){
+      const tenantGrants=await sb.rpc('tenant_feature_snapshot',{p_tenant:activeTenantId});
+      if(tenantGrants.error){notice='Could not load organization application permissions.';session=null;await sb.auth.signOut();return;}
+      organizationFeatures=tenantGrants.data?.organization||{};
+      tenantUserFeatures=tenantGrants.data?.user||{};
+    }
+    state = 'in';
     const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/portfolio-management/')?'portfolio_management':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
     try {

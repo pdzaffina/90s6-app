@@ -21,7 +21,7 @@ create trigger ainbox_kb_draft_entry before insert or update on public.knowledge
 
 alter table public.pm_initiatives add column if not exists assessment_completed_at timestamptz;
 alter table public.pm_initiatives add column if not exists assessment_completed_by uuid references public.profiles(id);
-create or replace function public.ainbox_set_assessment_actor() returns trigger language plpgsql set search_path='' as $
+create or replace function public.ainbox_set_assessment_actor() returns trigger language plpgsql set search_path='' as $ainbox$
 begin
  if tg_op='INSERT' then
   if new.assessment_completed_at is not null then
@@ -36,7 +36,7 @@ begin
   new.assessment_completed_by:=old.assessment_completed_by;
  end if;
  return new;
-end $;
+end $ainbox$;
 revoke all on function public.ainbox_set_assessment_actor() from public,anon,authenticated;
 create trigger ainbox_assessment_actor before insert or update on public.pm_initiatives
  for each row execute function public.ainbox_set_assessment_actor();

@@ -93,6 +93,6 @@ Deno.serve(async(req)=>{
   const sentences=assessment.match(/[^.!?]+[.!?]+|[^.!?]+$/g)||[];
   assessment=sentences.slice(0,3).join(" ").trim();
   return respond({assessment,model,scope:"assigned_accessible",facts:{active_count:facts.active_count,high_priority_count:facts.high_priority_count,in_progress_count:facts.in_progress_count},generated_at:new Date().toISOString()});
- }catch(e){await sb.rpc("ainbox_ai_audit_response",{p_usage:usageId,p_payload:null,p_http:null,p_provider_id:null,p_error:e instanceof Error?e.message:"Inference failed",p_input:null,p_output:null,p_cost:null}).catch(()=>{});return respond({error:e instanceof DOMException&&e.name==="AbortError"?"AI request timed out.":"AI assessment unavailable. The deterministic assessment remains available."},502)}
+ }catch(e){try{await sb.rpc("ainbox_ai_audit_response",{p_usage:usageId,p_payload:null,p_http:null,p_provider_id:null,p_error:e instanceof Error?e.message:"Inference failed",p_input:null,p_output:null,p_cost:null})}catch{}return respond({error:e instanceof DOMException&&e.name==="AbortError"?"AI request timed out.":"AI assessment unavailable. The deterministic assessment remains available."},502)}
  finally{clearTimeout(timer);await sb.rpc("ainbox_ai_finish",{p_id:usageId,p_input:usedInput,p_output:usedOutput,p_cost:(usedInput*inputRate+usedOutput*outputRate)/1000000,p_success:billed})}
 });

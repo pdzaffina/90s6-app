@@ -33,6 +33,8 @@ Deno.serve(async(req)=>{
  const {data:settings,error:settingsError}=await sb.rpc("ainbox_ai_runtime_settings",{p_tenant:tenant});
  if(settingsError)return respond({error:"AI configuration unavailable"},503);
  if(settings?.enabled===false)return respond({error:"AI is disabled by the global administrator"},403);
+ const {data:componentEnabled,error:componentError}=await sb.rpc("ainbox_ai_component_enabled",{p_key:"assessment"});
+ if(componentError||componentEnabled!==true)return respond({error:"AI assessment is disabled"},403);
  model=settings?.model||modelDefault;
  timeoutMs=Number(settings?.timeout_ms)||20000;
  maxTokens=Number(settings?.max_tokens)||300;

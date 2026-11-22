@@ -22,3 +22,14 @@
 .ainbox-rule-actions .ainbox-rule-save{background:#245e92;border-color:#245e92;color:#fff}
 .ainbox-rule-actions button:disabled{opacity:.55;cursor:wait}
 @media(max-width:620px){.ainbox-rule-fields{grid-template-columns:1fr}.ainbox-rule-editor{padding:16px}}
+
+/* Business Rules action buttons */
+.ainbox-rules .ainbox-rule-buttons{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-top:14px}
+.ainbox-rules .ainbox-rule-buttons button{display:inline-flex;align-items:center;justify-content:center;gap:9px;min-height:40px;padding:9px 16px;border-radius:10px;border:1px solid #ccdbe8;font-size:13px;font-weight:750;line-height:1.25;letter-spacing:.005em;box-shadow:0 1px 2px #102c460b;transition:background-color .16s,border-color .16s,box-shadow .16s,transform .16s}
+.ainbox-rules .ainbox-rule-buttons .ainbox-rule-run{background:#245e92;border-color:#245e92;color:#fff}
+.ainbox-rules .ainbox-rule-buttons .ainbox-rule-run:hover:not(:disabled){background:#194c79;border-color:#194c79;box-shadow:0 3px 10px #245e9229}
+.ainbox-rules .ainbox-rule-buttons .ainbox-rule-config{background:#f3f7fb;border-color:#cbdce9;color:#275578}
+.ainbox-rules .ainbox-rule-buttons .ainbox-rule-config:hover:not(:disabled){background:#e6f0f8;border-color:#a8c7df}
+.ainbox-rules .ainbox-rule-buttons button:focus-visible{outline:3px solid #7cb7e4;outline-offset:2px}
+.ainbox-rules .ainbox-rule-buttons button:disabled{opacity:.45;box-shadow:none}
+.ainbox-rules .ainbox-rule-buttons button span{font-size:13px;line-height:1}

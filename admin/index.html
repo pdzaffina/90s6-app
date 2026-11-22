@@ -14,10 +14,10 @@
 <div id="adminBody" hidden>
 <section class="ap-panel" style="margin-top:0"><h2>Invite a user</h2>
 <form id="inviteForm" class="ap-row"><input class="ap-input" id="inviteEmail" type="email" placeholder="name@company.com" autocomplete="off"><button class="ap-btn primary" type="submit">Send invitation</button></form></section>
-<section class="ap-panel"><h2>Bulk create users</h2>
-<p class="ap-msg">Upload a CSV with columns <code>email,full_name,password,role</code>. Roles: user, superuser, admin. Passwords are used only to create accounts and are never saved in the application or audit log. Existing accounts are skipped.</p>
-<div class="ap-row"><input class="ap-input" id="bulkCsv" type="file" accept=".csv,text/csv" aria-label="Upload user CSV"><button class="ap-btn primary" id="bulkCreate" type="button" disabled>Create users</button></div>
-<p id="bulkMsg" class="ap-msg" aria-live="polite"></p><div class="ap-wrap"><table class="ap-table" id="bulkPreview" hidden><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Result</th></tr></thead><tbody id="bulkRows"></tbody></table></div>
+<section class="ap-panel"><h2>Bulk manage users</h2>
+<p class="ap-msg">Upload a CSV with columns <code>email,full_name,password,role,active</code>. Roles: user, superuser, admin. Passwords are used only to create accounts and are never saved in the application or audit log. For existing accounts, only the active status changes. Use Y to enable or N to disable. Password is required for new accounts only. No accounts are deleted.</p>
+<div class="ap-row"><input class="ap-input" id="bulkCsv" type="file" accept=".csv,text/csv" aria-label="Upload user CSV"><button class="ap-btn primary" id="bulkCreate" type="button" disabled>Apply CSV</button></div>
+<p id="bulkMsg" class="ap-msg" aria-live="polite"></p><div class="ap-wrap"><table class="ap-table" id="bulkPreview" hidden><thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Active</th><th>Result</th></tr></thead><tbody id="bulkRows"></tbody></table></div>
 </section>
 <section class="ap-panel"><h2>Users</h2><p id="adminMsg" class="ap-msg"></p>
 <div class="ap-wrap"><table class="ap-table"><thead><tr><th><input type="checkbox" id="selectAllUsersTable" aria-label="Select all users"></th><th>Email</th><th>Name</th><th>Role</th><th>Status</th><th>Boards</th><th>Last seen</th><th></th></tr></thead><tbody id="userRows"></tbody></table></div></section>

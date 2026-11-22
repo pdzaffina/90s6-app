@@ -43,3 +43,6 @@
 .ainbox .ainbox-message--error{background:#fff0ed;border-color:#e9bdb3;color:#a33c29}
 .ainbox .ainbox-message--warning{background:#fff8e9;border-color:#ead4a4;color:#805c1d}
 .ainbox .ainbox-message--info{background:#edf5fc;border-color:#c9deef;color:#245b85}
+
+/* Deterministic workstream assessment immediately beneath the workstream heading. */
+.ainbox .ainbox-assessment{margin:10px 0 14px;color:#294b65;font-size:14px;line-height:1.65;font-weight:550;max-width:85ch}

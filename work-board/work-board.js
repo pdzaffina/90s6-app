@@ -319,9 +319,9 @@
   ldlg.innerHTML = `
     <div class="modal-head"><h2>Board layout</h2><p>Columns run across the top, swimlanes down the side. Up to 8 of each. Tasks follow a rename; if you remove one, its tasks move to the first.</p></div>
     <div class="wcBody">
+      <div class="field"><label>Template library</label><p class="wcMuted">Start from a ready-made board layout, then customize it before saving.</p><button type="button" class="ghost" id="wcOpenTemplates">Browse templates</button><div id="wcTemplateLibrary" hidden></div></div>
       <div class="field"><label>Columns</label><div id="wcCols" class="wcList"></div><button type="button" class="ghost" id="wcAddCol">+ Add column</button></div>
       <div class="field"><label>Swimlanes</label><div id="wcLanes" class="wcList"></div><button type="button" class="ghost" id="wcAddLane">+ Add swimlane</button></div>
-      <div class="field"><label>Template library</label><p class="wcMuted">Start from a ready-made board layout, then customize it before saving.</p><button type="button" class="ghost" id="wcOpenTemplates">Browse templates</button><div id="wcTemplateLibrary" hidden></div></div>
       <div class="actions"><button type="button" class="ghost" id="wcLayoutExport">Export layout (.json)</button><button type="button" class="ghost" id="wcLayoutImport">Import layout (.json)</button><input id="wcLayoutFile" type="file" accept=".json,application/json" hidden></div><p class="wcMuted">Layout files contain columns, swimlanes, and descriptions only. Work items are not exported.</p><p id="wcLayoutMsg" class="wcMuted"></p>
       <div class="actions"><button type="button" id="wcLayoutCancel">Cancel</button><button type="button" class="primary" id="wcLayoutSave">Save layout</button></div>
     </div>`;

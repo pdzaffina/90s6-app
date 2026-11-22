@@ -72,6 +72,86 @@
     catch (err) { say(err.message, true); }
   });
 
+
+  // CSV stays in memory only. Never display, persist or log password values.
+  let bulkUsers = [];
+  function parseCsv(input) {
+    const rows = []; let row = [], field = '', quoted = false;
+    for (let i = 0; i < input.length; i++) {
+      const c = input[i];
+      if (quoted) {
+        if (c === '"' && input[i + 1] === '"') { field += '"'; i++; }
+        else if (c === '"') quoted = false;
+        else field += c;
+      } else if (c === '"') {
+        if (field.trim()) throw new Error('Invalid CSV quoting.');
+        quoted = true;
+      } else if (c === ',') { row.push(field); field = ''; }
+      else if (c === '\\n' || c === '\\r') {
+        if (c === '\\r' && input[i + 1] === '\\n') i++;
+        row.push(field); field = '';
+        if (row.some(v => v.trim())) rows.push(row);
+        row = [];
+      } else field += c;
+    }
+    if (quoted) throw new Error('Unclosed CSV quote.');
+    row.push(field); if (row.some(v => v.trim())) rows.push(row);
+    return rows;
+  }
+  const bulkSay = (message, error = false) => {
+    $('bulkMsg').textContent = message;
+    $('bulkMsg').className = 'ap-msg' + (error ? ' err' : '');
+  };
+  $('bulkCsv').addEventListener('change', async () => {
+    bulkUsers = []; $('bulkCreate').disabled = true;
+    $('bulkRows').replaceChildren(); $('bulkPreview').hidden = true;
+    const file = $('bulkCsv').files[0]; if (!file) return;
+    try {
+      if (file.size > 256 * 1024) throw new Error('CSV must be under 256 KB.');
+      const rows = parseCsv((await file.text()).replace(/^\\uFEFF/, ''));
+      const header = (rows.shift() || []).map(x => x.trim().toLowerCase());
+      for (const name of ['email', 'full_name', 'password', 'role']) {
+        if (!header.includes(name)) throw new Error('Missing CSV column: ' + name);
+      }
+      if (rows.length < 1 || rows.length > 100) throw new Error('Upload 1 to 100 users per batch.');
+      const seen = new Set();
+      bulkUsers = rows.map((values, i) => {
+        if (values.length !== header.length) throw new Error('Wrong number of columns on data row ' + (i + 2));
+        const u = Object.fromEntries(header.map((key, j) => [key, values[j]]));
+        u.email = u.email.trim().toLowerCase();
+        u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase();
+        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(u.email)) throw new Error('Invalid email on row ' + (i + 2));
+        if (seen.has(u.email)) throw new Error('Duplicate email on row ' + (i + 2));
+        if (!['user', 'superuser', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
+        if (!u.full_name || u.password.length < 12) throw new Error('Name required and password must be at least 12 characters on row ' + (i + 2));
+        seen.add(u.email); return u;
+      });
+      bulkUsers.forEach(u => $('bulkRows').append(el('tr', {},
+        el('td', { textContent: u.email }), el('td', { textContent: u.full_name }),
+        el('td', { textContent: u.role }), el('td', { textContent: 'Ready' }))));
+      $('bulkPreview').hidden = false; $('bulkCreate').disabled = false;
+      bulkSay(bulkUsers.length + ' users ready. Review before creating.');
+    } catch (err) { bulkUsers = []; bulkSay(err.message, true); }
+  });
+  $('bulkCreate').addEventListener('click', async () => {
+    if (!bulkUsers.length || !confirm('Create ' + bulkUsers.length + ' user accounts?')) return;
+    $('bulkCreate').disabled = true;
+    bulkSay('Creating accounts...');
+    try {
+      const { results } = await call('bulk_create', { users: bulkUsers });
+      let success = 0, skipped = 0, failed = 0;
+      (results || []).forEach((r, i) => {
+        const status = r.status === 'created' ? 'Created' : r.status === 'skipped' ? 'Skipped' : 'Failed';
+        if (r.status === 'created') success++; else if (r.status === 'skipped') skipped++; else failed++;
+        $('bulkRows').rows[i].cells[3].textContent = status + (r.error ? ': ' + r.error : '');
+      });
+      bulkSay(success + ' created, ' + skipped + ' skipped, ' + failed + ' failed.');
+      bulkUsers = []; $('bulkCsv').value = '';
+      await load();
+    } catch (err) { bulkSay(err.message, true); }
+    finally { bulkUsers = []; $('bulkCreate').disabled = true; }
+  });
+
   // ---------- Audit log ----------
   let auditRows = [], auditMore = false;
   const auditSay = (t, err) => { const m = $('auditMsg'); m.textContent = t || ''; m.className = 'ap-msg' + (err ? ' err' : ''); };

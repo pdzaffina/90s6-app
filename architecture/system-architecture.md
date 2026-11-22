@@ -61,3 +61,7 @@ The repository contains page-oriented HTML/JavaScript modules and a shared appli
 - Keep service-role credentials server-side; never expose them through browser configuration.
 - Test cross-tenant reads, writes, invitations, exports, public links and bulk administration with negative authorization cases.
 - Inspect CI workflows and hosting configuration separately before documenting a specific deployment provider, rollback SLA or backup retention.
+
+## Action Inbox extension
+
+Action Inbox adds exception detection, manual business-rule scans, remediation, communications and activity auditing to the shared application shell. It evaluates Work Board, Knowledge Base and Portfolio records without taking ownership of those source records. Its detailed [component and lifecycle diagrams](action-inbox-system.md) and [RFC-002](RFC-002-action-inbox-architecture.md) document the implementation and operational gaps.

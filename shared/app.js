@@ -115,6 +115,7 @@
       // Local scope avoids waiting for a network sign-out request.
       const { error } = await sb.auth.signOut({ scope: 'local' });
       if (error) throw error;
+      const signedOutUserId = session?.user?.id;
       session = null; profile = null; state = 'out';
       gate.hidden = false; $('apForm').hidden = false; renderNav(); emit();
       try { sessionStorage.removeItem('ap-sess'); if (signedOutUserId) sessionStorage.removeItem('90s6-intro-launch:'+signedOutUserId); } catch (e) {}

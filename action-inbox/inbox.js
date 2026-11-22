@@ -110,6 +110,27 @@ async function renderDetail(x){
  }else{
   const c=detail.communication||{};
   body.innerHTML='<div class="section"><h3>Communication draft</h3><label>Recipient<input id="ainboxRecipient" maxlength="500"></label><label>Subject<input id="ainboxSubject" maxlength="300"></label><label>Message<textarea id="ainboxBody" maxlength="20000"></textarea></label><div class="actions"><button type="button" id="ainboxSaveComm">Save draft</button><button type="button" id="ainboxApproveComm">Approve</button><button type="button" id="ainboxRecordComm">Record delivery</button></div><p id="ainboxCommStatus"></p><small>Approval and recording delivery are separate. No automatic messages are sent.</small></div>';
+  const aiBar=document.createElement('div');aiBar.className='ainbox-ai-comm-controls';aiBar.style.cssText='margin:12px 0;padding:12px;border:1px solid var(--border,#ccd5df);border-radius:8px;display:grid;gap:10px';
+  aiBar.innerHTML='<div style="font-weight:600">✦ AI remediation communication</div><div style="display:flex;flex-wrap:wrap;gap:8px"><label>Type <select id="ainboxAiCommType"><option value="initial">Initial request</option><option value="followup">Follow-up</option><option value="escalation">Escalation</option></select></label><label>Tone <select id="ainboxAiCommTone"><option value="collaborative">Collaborative</option><option value="direct">Direct</option><option value="executive">Executive</option></select></label></div><button type="button" id="ainboxGenerateComm">Generate draft</button><small id="ainboxAiCommStatus">AI drafts are editable and are not automatically saved or sent.</small>';
+  body.querySelector('.section').insertBefore(aiBar,body.querySelector('.section').firstChild.nextSibling);
+  try{
+   const {data:enabled,error:enabledError}=await sb.rpc('ainbox_ai_component_enabled',{p_key:'communication'});
+   aiBar.hidden=!!enabledError||enabled!==true;
+  }catch{aiBar.hidden=true}
+  $('ainboxGenerateComm').onclick=async()=>{
+   const button=$('ainboxGenerateComm'),status=$('ainboxAiCommStatus');
+   if(($('ainboxSubject').value.trim()||$('ainboxBody').value.trim())&&!confirm('Replace the current subject and message with a new AI draft?'))return;
+   button.disabled=true;status.textContent='Generating a draft from the accessible exception…';
+   try{
+    const {data,error}=await sb.functions.invoke('ainbox-ai-communication',{body:{tenant_id:tenant,exception_id:x.id,type:$('ainboxAiCommType').value,tone:$('ainboxAiCommTone').value}});
+    if(error){let message=data?.error||error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
+    if(data?.error)throw Error(data.error);
+    if(selected!==x.id||detailTab!=='communication')return;
+    $('ainboxSubject').value=data.subject||'';$('ainboxBody').value=data.body||'';
+    status.textContent='Draft generated. Review and click Save draft to persist. Nothing has been sent.';
+   }catch(e){status.textContent='AI draft unavailable: '+e.message}
+   finally{button.disabled=false}
+  };
   $('ainboxRecipient').value=c.recipient||'';$('ainboxSubject').value=c.subject||'';$('ainboxBody').value=c.body||'';
   $('ainboxCommStatus').textContent=c.status||'New draft';
   $('ainboxSaveComm').onclick=async()=>{try{await rpc('ainbox_save_communication',{p_tenant:tenant,p_exception:x.id,p_recipient:$('ainboxRecipient').value,p_subject:$('ainboxSubject').value,p_body:$('ainboxBody').value});renderDetail(x)}catch(e){msg(e.message,'error')}};

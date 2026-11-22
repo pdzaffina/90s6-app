@@ -1,6 +1,6 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id),sb=App.sb;
-let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[],assessmentItems=[],scanCoverage=[],assessmentFull=false;
+let user=null,tenant=null,role='',tab='mine',items=[],workstreams=[],selected=null,detailTab='remediation',rules=[],assessmentItems=[],scanCoverage=[],assessmentFull=false,aiScope='',aiRequest=0;
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const msg=(message,type='info')=>{const el=$('ainboxMessage');if(!el)return;el.textContent=message||'';el.hidden=!message;el.className='ainbox-message ainbox-message--'+(message?type:'info');el.setAttribute('role',type==='error'?'alert':'status');};
 const date=s=>s?new Date(s).toLocaleString():'Not yet';
@@ -48,6 +48,8 @@ function render(){
  if(!list.some(x=>x.id===selected)){selected=list[0]?.id||null;detailTab='remediation';}
  $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
  $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
+ const scopeKey=tenant+':'+tab+':'+(w?.id||'all');
+ if(aiScope!==scopeKey){aiScope=scopeKey;aiRequest++;$('ainboxAIText').textContent='Generate an AI interpretation of your accessible exceptions. The deterministic assessment above remains authoritative.';}
  const assessment=workstreamAssessment(w?.id||null);
  $('ainboxHealth').textContent=assessment.health;
  $('ainboxAssessment').textContent=assessment.text;
@@ -175,6 +177,21 @@ async function loadRules(){
 document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
 ['ainboxWorkstream','ainboxStatus','ainboxSearch'].forEach(id=>$(id).addEventListener(id==='ainboxSearch'?'input':'change',render));
 $('ainboxRefresh').onclick=()=>tab==='rules'?loadRules():load();
+$('ainboxGenerateAI').onclick=async()=>{
+ const button=$('ainboxGenerateAI'),output=$('ainboxAIText');
+ const scope=aiScope,request=++aiRequest;
+ button.disabled=true;button.textContent='Generating…';
+ output.textContent='Reviewing your accessible exception summary…';
+ try{
+  const {data,error}=await sb.functions.invoke('ainbox-ai-assessment',{body:{tenant_id:tenant,workstream_id:$('ainboxWorkstream').value||null}});
+  if(error)throw Error(data?.error||error.message||'AI provider unavailable');
+  if(data?.error)throw Error(data.error);
+  if(scope!==aiScope||request!==aiRequest)return;
+  if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');
+  output.textContent=data.assessment+'  ·  AI interpretation of assigned, accessible exceptions only.';
+ }catch(e){if(scope===aiScope&&request===aiRequest)output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}
+ finally{button.disabled=false;button.textContent='Generate assessment';}
+};
 $('ainboxScan').onclick=loadRules;
 App.onSession(async(s,p)=>{if(!s)return;user=p;tenant=App.activeTenantId;role=App.tenantRole?.(tenant)||'';if(!tenant){msg('Choose an organization to use Action Inbox.','warning');return}
  document.querySelector('[data-tab="all"]').hidden=!allowedAdmin();document.querySelector('[data-tab="rules"]').hidden=!allowedAdmin();await load()});

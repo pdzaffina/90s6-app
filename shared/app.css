@@ -119,7 +119,7 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 @media(max-width:850px){#appNav .ap-nav-top{padding:9px 16px}#appNav .ap-nav-bottom{padding:0 12px}#appNav nav{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:thin}#appNav nav a[href="/admin/"],#appNav nav a[href="/tenant-admin/"]{margin-left:0}#appNav .ap-org-label{display:none}}
 @media(max-width:520px){#appNav .brand{font-size:20px}#appNav .ap-nav-account{gap:8px}#appNav .ap-org-control{padding:6px 8px;max-width:190px}#appNav #apTenantSelect{min-width:0;max-width:120px}#appNav .who{display:none}#appNav #apUserButton{padding-left:8px}#appNav .ap-tenant-name{max-width:120px}}
 
-/* Brand wordmark: dark 90 and 6, electric-blue lowercase s, on white. */
-#appNav .ap-wordmark{display:inline-flex;align-items:baseline;gap:0;background:#fff;color:#19223b;padding:4px 12px 6px;border-radius:8px;font-family:var(--ap-font);font-size:34px;font-weight:900;line-height:1;letter-spacing:-2.6px;text-decoration:none}
+/* Brand wordmark: light gray 90 and 6, electric-blue lowercase s, on dark. */
+#appNav .ap-wordmark{display:inline-flex;align-items:baseline;gap:0;background:transparent;color:#c4cbd5;padding:4px 12px 6px;border-radius:8px;font-family:var(--ap-font);font-size:34px;font-weight:900;line-height:1;letter-spacing:-2.6px;text-decoration:none}
 #appNav .ap-wordmark .ap-logo-s{color:#4c6bf0}
 @media(max-width:520px){#appNav .ap-wordmark{font-size:29px;padding:5px 9px;letter-spacing:-2.2px}}

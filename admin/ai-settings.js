@@ -68,6 +68,69 @@ async function refreshModels(selected){
 }
 $('globalAiRefreshModels').onclick=()=>refreshModels($('globalAiModel').value);
 
+async function loadUsage(){
+ const [usage,rates]=await Promise.all([rpc('ainbox_ai_usage_summary'),rpc('ainbox_ai_pricing')]);
+ const usd=n=>'
+ const list=await rpc('ainbox_ai_list_components');
+ const target=$('globalAiComponents');target.replaceChildren();
+ for(const component of list){
+  const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:12px';
+  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=component.enabled;
+  const info=document.createElement('span');
+  const name=document.createElement('strong');name.textContent=component.label;
+  const description=document.createElement('small');description.style.cssText='display:block;opacity:.7';description.textContent=component.description;
+  info.append(name,description);row.append(toggle,info);target.append(row);
+  toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled');}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message;}finally{toggle.disabled=false;}};
+ }
+}
+async function load(){
+ try{
+  const settings=await rpc('ainbox_ai_get_settings');
+  const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
+  await loadComponents();
+  await loadUsage();
+  await refreshModels(settings.model);
+  $('globalAiTimeout').value=String(settings.timeout_ms/1000);
+  $('globalAiTokens').value=String(settings.max_tokens);
+  say('Settings loaded. Changes apply to the next AI assessment.');
+ }catch(e){say('Unable to load AI settings: '+e.message,true);}
+}
+form.addEventListener('submit',async event=>{
+ event.preventDefault();
+ if(!allowed)return;
+ const model=$('globalAiModel').value,seconds=Number($('globalAiTimeout').value),tokens=Number($('globalAiTokens').value);
+ if(!Number.isInteger(seconds)||seconds<5||seconds>60||!Number.isInteger(tokens)||tokens<100||tokens>4096){say('Timeout must be 5 to 60 seconds and tokens 100 to 4096.',true);return}
+ const button=$('globalAiSave');button.disabled=true;say('Saving settings…');
+ try{await rpc('ainbox_ai_save_settings',{p_model:model,p_timeout_ms:seconds*1000,p_max_tokens:tokens});say('AI settings saved. The next assessment will use the selected configuration.');}
+ catch(e){say('Could not save AI settings: '+e.message,true)}
+ finally{button.disabled=false;}
+});
+App.onSession(async(session,profile)=>{
+ allowed=!!session&&!!profile?.is_admin;
+ $('globalAiPanel').hidden=!allowed;
+ if(allowed)await load();
+});
+})();
++Number(n||0).toFixed(4);
+ $('globalAiBudget').value=Number(rates.budget);
+ $('globalAiInputRate').value=Number(rates.input);
+ $('globalAiOutputRate').value=Number(rates.output);
+ const used=Number(usage.spent||0),reserved=Number(usage.reserved||0),budget=Number(usage.budget||0);
+ const container=$('globalAiUsage');container.replaceChildren();
+ const summary=document.createElement('p');summary.textContent='This month: '+usage.requests+' requests · '+Number(usage.input_tokens||0).toLocaleString()+' input tokens · '+Number(usage.output_tokens||0).toLocaleString()+' output tokens · '+usd(used)+' estimated spent · '+usd(reserved)+' reserved · '+usd(budget)+' limit';
+ container.append(summary);
+ const bar=document.createElement('progress');bar.max=Math.max(budget,0.000001);bar.value=Math.min(budget,used+reserved);bar.style.width='100%';container.append(bar);
+ for(const c of usage.components||[]){const line=document.createElement('p');line.textContent=c.component_key+': '+c.requests+' requests · '+usd(c.cost);container.append(line)}
+}
+$('globalAiUsageRefresh').onclick=()=>loadUsage().catch(e=>$('globalAiBudgetStatus').textContent=e.message);
+$('globalAiBudgetSave').onclick=async()=>{
+ const budget=Number($('globalAiBudget').value),input=Number($('globalAiInputRate').value),output=Number($('globalAiOutputRate').value);
+ if(![budget,input,output].every(Number.isFinite)||[budget,input,output].some(x=>x<0)){ $('globalAiBudgetStatus').textContent='Enter valid nonnegative values';return}
+ const button=$('globalAiBudgetSave');button.disabled=true;
+ try{await rpc('ainbox_ai_set_budget',{p_usd:budget});await rpc('ainbox_ai_set_rates',{p_input:input,p_output:output});await loadUsage();$('globalAiBudgetStatus').textContent='Budget and estimated token rates saved.'}
+ catch(e){$('globalAiBudgetStatus').textContent='Could not save: '+e.message}
+ finally{button.disabled=false}
+};
 async function loadComponents(){
  const list=await rpc('ainbox_ai_list_components');
  const target=$('globalAiComponents');target.replaceChildren();

@@ -5,20 +5,24 @@ if(!form)return;
 const say=(message,error=false)=>{status.textContent=message;status.className='ap-msg'+(error?' err':'');};
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data;};
 let allowed=false;
+$('globalAiTestType').onchange=()=>{$('globalAiAlternateWrap').hidden=$('globalAiTestType').value!=='alternate';};
 $('globalAiTest').onclick=async()=>{
  if(!allowed)return;
  const button=$('globalAiTest'),output=$('globalAiTestResult');
  button.disabled=true;output.textContent='Testing saved model with a minimal request (up to 60 seconds)…';
  try{
-  const {data,error}=await App.sb.functions.invoke('ainbox-ai-diagnostic',{body:{}});
+  const {data,error}=await App.sb.functions.invoke('ainbox-ai-diagnostic',{body:{test:$('globalAiTestType').value,model:$('globalAiAlternateModel').value}});
   if(error){let message=error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
   if(data?.error)throw Error(data.error);
   const fmt=ms=>ms===null||ms===undefined?'not reached':(ms/1000).toFixed(3)+' seconds';
   output.textContent=[
+   'Test: '+(data.test??'minimal'),
    'Model: '+data.model,
    'HTTP status: '+(data.http_status??'no provider response'),
    'Time to response headers: '+fmt(data.headers_ms),
+   'Time to first streamed token: '+fmt(data.first_token_ms),
    'Time to complete response: '+fmt(data.body_ms??data.elapsed_ms),
+   'Models returned: '+(data.model_count??'not applicable'),
    'Visible text returned: '+(data.visible_text===undefined?'unknown':data.visible_text?'yes':'no'),
    'Finish reason: '+(data.finish_reason??'not provided'),
    'Completion tokens: '+(data.completion_tokens??'not provided'),
@@ -38,7 +42,11 @@ async function refreshModels(selected){
   if(error||data?.error)throw Error(data?.error||error.message);
   if(!Array.isArray(data?.models)||!data.models.length)throw Error('No models returned');
   picker.replaceChildren();
-  for(const model of data.models)picker.add(new Option(model.label===model.id?model.id:model.label+' ('+model.id+')',model.id));
+  const alternate=$('globalAiAlternateModel'),prior=alternate.value;
+  alternate.replaceChildren();
+  for(const model of data.models){const label=model.label===model.id?model.id:model.label+' ('+model.id+')';picker.add(new Option(label,model.id));alternate.add(new Option(label,model.id));}
+  if(data.models.some(m=>m.id===prior))alternate.value=prior;
+  else if(data.models.some(m=>m.id!==selected))alternate.value=data.models.find(m=>m.id!==selected).id;
   if(selected&&!data.models.some(m=>m.id===selected))picker.add(new Option('Currently configured: '+selected,selected));
   picker.value=selected&&Array.from(picker.options).some(x=>x.value===selected)?selected:data.models[0].id;
   say(data.models.length+' provider models loaded. Some may not support chat completions.');

@@ -63,6 +63,54 @@ Deno.serve(async (req) => {
       await log('admin.invite_user', email);
       return json({ ok: true });
     }
+    case 'bulk_create': {
+      if (!Array.isArray(b.users) || b.users.length < 1 || b.users.length > 100)
+        return json({ error: 'Submit 1 to 100 users.' }, 400);
+      const seen = new Set<string>();
+      const entries = [];
+      for (const item of b.users) {
+        if (!item || typeof item !== 'object') return json({ error: 'Invalid user entry.' }, 400);
+        const v = item as Record<string, unknown>;
+        const email = String(v.email ?? '').trim().toLowerCase();
+        const full_name = String(v.full_name ?? '').trim();
+        const password = String(v.password ?? '');
+        const role = String(v.role ?? '').trim().toLowerCase();
+        if (!EMAIL.test(email) || email.length > 254 || !full_name || full_name.length > 200 ||
+            password.length < 12 || password.length > 128 || !['user', 'superuser', 'admin'].includes(role) || seen.has(email))
+          return json({ error: 'Invalid or duplicate CSV entry. Each user needs a unique email, name, role, and password of 12 to 128 characters.' }, 400);
+        seen.add(email); entries.push({ email, full_name, password, role });
+      }
+      const { data: existing, error: existingError } = await db.from('profiles').select('email').in('email', entries.map(v => v.email));
+      if (existingError) return fail(existingError);
+      const known = new Set((existing ?? []).map(v => String(v.email).toLowerCase()));
+      const results = [];
+      for (const entry of entries) {
+        const { email, full_name, password, role } = entry;
+        if (known.has(email)) { results.push({ email, status: 'skipped' }); continue; }
+        const { data, error } = await db.auth.admin.createUser({
+          email, password, email_confirm: true, user_metadata: { full_name }
+        });
+        if (error) {
+          results.push({ email, status: /already (registered|exists)|duplicate/i.test(error.message) ? 'skipped' : 'failed', error: error.message });
+          continue;
+        }
+        const uid = data.user?.id;
+        if (!uid) { results.push({ email, status: 'failed', error: 'No user ID returned.' }); continue; }
+        const { error: profileError } = await db.from('profiles').upsert({
+          id: uid, email, full_name, is_admin: role === 'admin', is_superuser: role === 'superuser'
+        }, { onConflict: 'id' });
+        if (profileError) {
+          // Do not leave a partly provisioned account with incorrect permissions.
+          await db.auth.admin.deleteUser(uid);
+          results.push({ email, status: 'failed', error: 'Profile provisioning failed.' });
+          continue;
+        }
+        await log('admin.bulk_create_user', email, { role });
+        known.add(email);
+        results.push({ email, status: 'created' });
+      }
+      return json({ results });
+    }
     case 'set_admin': {
       const bad = needOther(); if (bad) return bad;
       const { error } = await db.from('profiles').update({ is_admin: b.is_admin === true }).eq('id', id);

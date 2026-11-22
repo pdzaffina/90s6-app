@@ -184,7 +184,7 @@ $('ainboxGenerateAI').onclick=async()=>{
  output.textContent='Reviewing your accessible exception summary…';$('ainboxAiBadge').hidden=true;
  try{
   const {data,error}=await sb.functions.invoke('ainbox-ai-assessment',{body:{tenant_id:tenant,workstream_id:$('ainboxWorkstream').value||null}});
-  if(error)throw Error(data?.error||error.message||'AI provider unavailable');
+  if(error){let detail=data?.error;try{const response=error.context;if(response&&typeof response.json==='function'){const body=await response.json();detail=body?.error||detail;}}catch{}throw Error(detail||error.message||'AI provider unavailable');}
   if(data?.error)throw Error(data.error);
   if(scope!==aiScope||request!==aiRequest)return;
   if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');

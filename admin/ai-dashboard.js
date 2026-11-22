@@ -20,9 +20,31 @@ async function load(){
   const components=summary.components||[];
   if(!components.length)container.textContent='No requests tracked this month.';
   for(const component of components){const line=document.createElement('p');line.textContent=component.component_key+': '+Number(component.requests).toLocaleString()+' requests, '+money(component.cost)+' estimated';container.append(line)}
+  await loadAudit();
   $('dashboard').hidden=false;
  }catch(e){$('error').textContent='Could not load AI usage: '+e.message}
 }
+async function loadAudit(){
+ const rows=await rpc('ainbox_ai_audit_list',{p_limit:100});
+ const tbody=$('auditRows');tbody.replaceChildren();
+ if(!rows?.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=9;td.textContent='No audited requests yet. New AI calls will appear here.';tr.append(td);tbody.append(tr);return}
+ for(const a of rows){
+  const tr=document.createElement('tr');
+  const values=[new Date(a.request_at).toLocaleString(),a.component_key,a.model,a.http_status||'Pending',a.input_tokens??'N/A',a.output_tokens??'N/A',a.total_tokens??'N/A',a.estimated_usd==null?'N/A':money(a.estimated_usd)];
+  for(const value of values){const td=document.createElement('td');td.textContent=String(value);tr.append(td)}
+  const cell=document.createElement('td'),button=document.createElement('button');button.textContent='Inspect';button.onclick=async()=>{
+   button.disabled=true;
+   try{
+    const detail=await rpc('ainbox_ai_audit_detail',{p_usage:a.usage_id});
+    $('auditMeta').textContent='Request '+a.usage_id+' · Organization '+a.tenant_id+' · User '+a.user_id+' · '+(a.error_message||'No recorded provider error');
+    $('auditRequest').textContent=JSON.stringify(detail.request_payload,null,2);
+    $('auditResponse').textContent=detail.response_payload==null?'No provider response recorded':JSON.stringify(detail.response_payload,null,2);
+    $('auditDetail').hidden=false;$('auditDetail').scrollIntoView({behavior:'smooth',block:'nearest'});
+   }catch(e){$('error').textContent='Could not inspect audit: '+e.message}finally{button.disabled=false}
+  };cell.append(button);tr.append(cell);tbody.append(tr)
+ }
+}
+$('closeDetail').onclick=()=>{$('auditDetail').hidden=true};
 $('refresh').onclick=load;
 $('budgetForm').onsubmit=async e=>{
  e.preventDefault();if(!authorized)return;

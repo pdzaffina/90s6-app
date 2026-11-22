@@ -35,7 +35,7 @@ function render(){
  $('ainboxList').querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.id;detailTab='remediation';render()}));
  renderDetail(items.find(x=>x.id===selected));
 }
-function renderDetail(x){
+async function renderDetail(x){
  const el=$('ainboxDetail');
  if(!x){el.innerHTML='<h2>Choose an exception</h2><p>Review evidence, next steps and verification here.</p>';return}
  const url=x.source_type==='work_board'?'/work-board/':x.source_type==='portfolio'?'/portfolio-management/':'/content-studio/';
@@ -45,7 +45,27 @@ function renderDetail(x){
  <div id="ainboxDetailBody"></div>`;
  $('ainboxProgressAction').onclick=()=>change(x,'in_progress');$('ainboxSnooze').onclick=()=>change(x,'snoozed',new Date(Date.now()+86400000).toISOString());$('ainboxDismiss').onclick=()=>change(x,'dismissed');
  el.querySelectorAll('[data-detail]').forEach(b=>b.onclick=()=>{detailTab=b.dataset.detail;renderDetail(x)});
- $('ainboxDetailBody').innerHTML=detailTab==='remediation'?'<div class="section"><h3>Guided remediation</h3><p>Correct the issue in its source application. Completing a checklist is not compliance verification. A future scan must confirm resolution.</p></div>':detailTab==='communication'?'<div class="section"><h3>Communication</h3><p>Editable drafts and approval will be available once the secure communication RPCs are enabled. No messages are sent automatically.</p></div>':'<div class="section"><h3>Activity</h3><p>Detection, state changes and verification history are recorded by the server.</p></div>';
+ const body=$('ainboxDetailBody');
+ body.textContent='Loading…';
+ try{
+ const detail=await rpc('ainbox_get_exception_detail',{p_tenant:tenant,p_id:x.id});
+ if(selected!==x.id)return;
+ if(detailTab==='remediation'){
+  body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. The next verified scan resolves compliant exceptions. Completing steps alone never closes an exception.</p></div>';
+ }else if(detailTab==='activity'){
+  body.innerHTML='<div class="section"><h3>Activity history</h3>'+(detail.activity||[]).map(a=>'<p>'+esc(a.event_type.replaceAll('_',' '))+' · '+esc(date(a.occurred_at))+'</p>').join('')+'</div>';
+ }else{
+  const c=detail.communication||{};
+  body.innerHTML='<div class="section"><h3>Communication draft</h3><label>Recipient<input id="ainboxRecipient" maxlength="500"></label><label>Subject<input id="ainboxSubject" maxlength="300"></label><label>Message<textarea id="ainboxBody" maxlength="20000"></textarea></label><div class="actions"><button type="button" id="ainboxSaveComm">Save draft</button><button type="button" id="ainboxApproveComm">Approve</button><button type="button" id="ainboxRecordComm">Record delivery</button></div><p id="ainboxCommStatus"></p><small>Approval and recording delivery are separate. No automatic messages are sent.</small></div>';
+  $('ainboxRecipient').value=c.recipient||'';$('ainboxSubject').value=c.subject||'';$('ainboxBody').value=c.body||'';
+  $('ainboxCommStatus').textContent=c.status||'New draft';
+  $('ainboxSaveComm').onclick=async()=>{try{await rpc('ainbox_save_communication',{p_tenant:tenant,p_exception:x.id,p_recipient:$('ainboxRecipient').value,p_subject:$('ainboxSubject').value,p_body:$('ainboxBody').value});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxApproveComm').disabled=!allowedAdmin()||!c.id||c.status!=='draft';
+  $('ainboxApproveComm').onclick=async()=>{try{await rpc('ainbox_approve_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxRecordComm').disabled=!c.id||c.status!=='approved';
+  $('ainboxRecordComm').onclick=async()=>{const channel=prompt('Delivery channel: email, chat, phone, meeting, other','email');if(channel===null)return;const reference=prompt('Delivery reference or note (optional)','');if(reference===null)return;try{await rpc('ainbox_record_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version,p_channel:channel,p_reference:reference});renderDetail(x)}catch(e){msg(e.message)}};
+ }
+ }catch(e){body.textContent='Could not load details: '+e.message}
 }
 async function change(x,status,until){
  try{await rpc('ainbox_set_exception_state',{p_tenant:tenant,p_id:x.id,p_status:status,p_revision:x.revision,p_snoozed_until:until||null});await load()}

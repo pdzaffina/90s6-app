@@ -28,6 +28,7 @@ $('pwForm').addEventListener('submit', async e => {
 $('resetPresentation').addEventListener('click', async () => {
  if (!userId) return;
  const {error}=await App.sb.from('profiles').update({intro_presentation_completed_at:null}).eq('id',userId);
+ if(!error) sessionStorage.removeItem('90s6-intro-launch:'+userId);
  $('presentationMsg').textContent=error?error.message:'Presentation reset. It will appear when you next sign in.';
  $('presentationMsg').className='ap-msg'+(error?' err':'');
 });

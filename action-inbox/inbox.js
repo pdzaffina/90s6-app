@@ -49,7 +49,7 @@ function render(){
  $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
  $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
  const scopeKey=tenant+':'+tab+':'+(w?.id||'all');
- if(aiScope!==scopeKey){aiScope=scopeKey;aiRequest++;$('ainboxAIText').textContent='Generate an AI interpretation of your accessible exceptions. The deterministic assessment above remains authoritative.';}
+ if(aiScope!==scopeKey){aiScope=scopeKey;aiRequest++;$('ainboxAiBadge').hidden=true;$('ainboxAIText').textContent='Generate an AI interpretation of your accessible exceptions. The deterministic assessment above remains authoritative.';}
  const assessment=workstreamAssessment(w?.id||null);
  $('ainboxHealth').textContent=assessment.health;
  $('ainboxAssessment').textContent=assessment.text;
@@ -181,7 +181,7 @@ $('ainboxGenerateAI').onclick=async()=>{
  const button=$('ainboxGenerateAI'),output=$('ainboxAIText');
  const scope=aiScope,request=++aiRequest;
  button.disabled=true;button.textContent='Generating…';
- output.textContent='Reviewing your accessible exception summary…';
+ output.textContent='Reviewing your accessible exception summary…';$('ainboxAiBadge').hidden=true;
  try{
   const {data,error}=await sb.functions.invoke('ainbox-ai-assessment',{body:{tenant_id:tenant,workstream_id:$('ainboxWorkstream').value||null}});
   if(error)throw Error(data?.error||error.message||'AI provider unavailable');
@@ -189,6 +189,7 @@ $('ainboxGenerateAI').onclick=async()=>{
   if(scope!==aiScope||request!==aiRequest)return;
   if(typeof data?.assessment!=='string'||!data.assessment.trim())throw Error('No assessment returned');
   output.textContent=data.assessment+'  ·  AI interpretation of assigned, accessible exceptions only.';
+  $('ainboxAiBadge').hidden=false;
  }catch(e){if(scope===aiScope&&request===aiRequest)output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}
  finally{button.disabled=false;button.textContent='Generate assessment';}
 };

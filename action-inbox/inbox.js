@@ -51,7 +51,17 @@ async function renderDetail(x){
  const detail=await rpc('ainbox_get_exception_detail',{p_tenant:tenant,p_id:x.id});
  if(selected!==x.id)return;
  if(detailTab==='remediation'){
-  body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. The next verified scan resolves compliant exceptions. Completing steps alone never closes an exception.</p></div>';
+  const plan=(detail.remediation||[])[0];
+  const steps=plan?.steps||[];
+  body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. Completing steps does not resolve the exception until a verified scan confirms compliance.</p><p>Plan status: <strong>'+esc(plan?.status||'Not created')+'</strong></p><label>Remediation steps (one per line)<textarea id="ainboxSteps" rows="5" maxlength="10000" placeholder="Describe the steps to restore compliance"></textarea></label><div class="actions"><button type="button" id="ainboxSavePlan">Save plan</button><button type="button" id="ainboxApprovePlan">Approve plan</button></div><div id="ainboxStepChecklist"></div></div>';
+  $('ainboxSteps').value=steps.map(z=>z.description).join('\n');
+  $('ainboxSavePlan').onclick=async()=>{try{const values=$('ainboxSteps').value.split('\n').map(t=>t.trim()).filter(Boolean);await rpc('ainbox_save_remediation',{p_tenant:tenant,p_exception:x.id,p_steps:values});renderDetail(x)}catch(e){msg(e.message)}};
+  $('ainboxApprovePlan').disabled=!allowedAdmin()||!plan||plan.status!=='proposed';
+  $('ainboxApprovePlan').onclick=async()=>{try{await rpc('ainbox_approve_remediation',{p_tenant:tenant,p_plan:plan.id,p_revision:plan.revision});renderDetail(x)}catch(e){msg(e.message)}};
+  const checklist=$('ainboxStepChecklist');
+  checklist.innerHTML=steps.map(z=>'<label class="ainbox-check"><input type="checkbox" data-step="'+esc(z.id)+'" '+(z.completed_at?'checked':'')+' '+(!['approved','in_progress','completed'].includes(plan.status)?'disabled':'')+'><span>'+esc(z.description)+'</span></label>').join('');
+  checklist.querySelectorAll('[data-step]').forEach(input=>input.onchange=async()=>{try{await rpc('ainbox_complete_remediation_step',{p_tenant:tenant,p_step:input.dataset.step,p_completed:input.checked});renderDetail(x)}catch(e){msg(e.message);renderDetail(x)}});
+  
  }else if(detailTab==='activity'){
   body.innerHTML='<div class="section"><h3>Activity history</h3>'+(detail.activity||[]).map(a=>'<p>'+esc(a.event_type.replaceAll('_',' '))+' · '+esc(date(a.occurred_at))+'</p>').join('')+'</div>';
  }else{

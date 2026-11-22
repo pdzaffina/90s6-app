@@ -1,7 +1,7 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id),sb=App.sb;
-const features=[['portfolio_management','Portfolio Management'],['work_board','Work Boards'],['training','Training'],['prompt_library','Prompt Library'],['content_studio','Content Studio'],['studio_courses','Course editing'],['studio_prompts','Prompt editing'],['studio_knowledge','Knowledge editing'],['knowledge_base','Knowledge Base'],['use_case_curator','Create Custom Plan']];
+const features=[['portfolio_management','Portfolio Management'],['work_board','Work Boards'],['training','Training'],['prompt_library','Prompt Library'],['content_studio','Content Studio'],['studio_courses','Course editing'],['studio_prompts','Prompt editing'],['studio_knowledge','Knowledge editing'],['knowledge_base','Knowledge Base'],['use_case_curator','Create Custom Plan'],['action_inbox','Action Inbox']];
 let current=null,tenant=null,memberIds=[];
 const status=t=>$('tenantAdminStatus').textContent=t;
 const option=(value,label)=>{const o=document.createElement('option');o.value=value;o.textContent=label;return o;};

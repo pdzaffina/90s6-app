@@ -12,7 +12,7 @@
 
   const listeners = [];
   const beforeOut = [];
-  let session = null, profile = null, state = 'unknown', notice = ''; let tenantMemberships = [], activeTenantId = null; let features = {}, organizationFeatures = {}, tenantUserFeatures = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator']; const hasFeature=k=>!!profile?.is_admin || (features[k] !== false && organizationFeatures[k] !== false && tenantUserFeatures[k] !== false);
+  let session = null, profile = null, state = 'unknown', notice = ''; let tenantMemberships = [], activeTenantId = null; let features = {}, organizationFeatures = {}, tenantUserFeatures = {}; const featureNames=['portfolio_management','work_board','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator','action_inbox']; const hasFeature=k=>!!profile?.is_admin || ((k!=='action_inbox'||organizationFeatures[k]===true) && features[k] !== false && organizationFeatures[k] !== false && tenantUserFeatures[k] !== false);
 
   const tenantRole = (id = activeTenantId) => tenantMemberships.find(m => m.tenant_id === id)?.role || null;
   const isTenantAdmin = (id = activeTenantId) => !!profile?.is_admin || tenantRole(id) === 'tenant_admin';
@@ -64,7 +64,7 @@
         </div>
       </div>
     </div>
-    <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
+    <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/action-inbox/">Action Inbox</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
   document.body.prepend(nav);
   nav.querySelectorAll('nav a').forEach(a => {
     if (location.pathname.startsWith(a.getAttribute('href'))) a.setAttribute('aria-current', 'page');
@@ -90,7 +90,7 @@
     $('apTenantName').textContent=tenantMemberships.find(m=>m.tenant_id===activeTenantId)?.tenants?.name || (profile.is_admin?'Global Administration':'No organization');
     $('apOrgChevron').hidden=!multipleOrgs;
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
-    [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
+    [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base'],['/action-inbox/','action_inbox']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     $('apWho').textContent = profile.full_name || profile.email || '';
     $('apAvatar').textContent=(profile.full_name || profile.email || 'U').split(/[\\s@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('');
   }
@@ -132,7 +132,7 @@
       tenantUserFeatures=tenantGrants.data?.user||{};
     }
     state = 'in';
-    const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/portfolio-management/')?'portfolio_management':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
+    const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/portfolio-management/')?'portfolio_management':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/action-inbox/')?'action_inbox':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
     try {
       if (sessionStorage.getItem('ap-sess') !== s.user.id) {

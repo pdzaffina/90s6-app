@@ -15,6 +15,7 @@
   }
 
   const sb = window.App.sb;
+  async function loadOwnerDirectory(){const select=document.getElementById('owner_id');if(!select||!App.activeTenantId)return;const {data,error}=await sb.rpc('ainbox_member_directory',{p_tenant:App.activeTenantId});if(error)return;select.replaceChildren(new Option('Unassigned',''),...(data||[]).map(x=>new Option(x.name,x.id)));}
   const $ = id => document.getElementById(id);
   const el = (tag, props = {}, ...kids) => { const n = document.createElement(tag); Object.assign(n, props); n.append(...kids); return n; };
   const toast = m => board.toast(m);
@@ -138,6 +139,7 @@
     try { localStorage.setItem(CURRENT_KEY, id); } catch (e) {}
     document.body.classList.toggle('readonly', current.role === 'viewer');
     board.set(Array.isArray(data.data) ? data.data : [], data.config);
+    await loadOwnerDirectory();
     renderBar();
     ready = true;
     return true;
@@ -339,12 +341,14 @@
     rows.forEach((r, i) => {
       const name = el('input', { value: r.name, maxLength: 30, placeholder: 'Name' });
       const hint = el('input', { value: r.hint, maxLength: 80, placeholder: 'Short description (optional)' });
+      const completion = kind==='cols' ? el('label', { textContent: 'Completion column ' }) : null;
+      if(completion){const check=el('input',{type:'checkbox',checked:!!r.is_completion});check.addEventListener('change',()=>r.is_completion=check.checked);completion.append(check)}
       name.addEventListener('input', () => { r.name = name.value; });
       hint.addEventListener('input', () => { r.hint = hint.value; });
       const btn = (text, fn, off) => { const b = el('button', { type: 'button', className: 'ghost', textContent: text, disabled: !!off }); b.addEventListener('click', fn); return b; };
       const swap = d => { [rows[i], rows[i + d]] = [rows[i + d], rows[i]]; drawLayout(kind); };
       box.append(el('div', { className: 'wcPerson' },
-        el('div', { className: 'wcLayRow' }, name, hint),
+        el('div', { className: 'wcLayRow' }, name, hint, ...(completion?[completion]:[])),
         btn('Up', () => swap(-1), i === 0),
         btn('Down', () => swap(1), i === rows.length - 1),
         btn('Remove', () => { rows.splice(i, 1); drawLayout(kind); }, rows.length === 1)));
@@ -355,14 +359,14 @@
     if (!canManage || !current || current.role === 'viewer') return;
     const cur = board.getLayout();
     draft = {
-      cols: cur.columns.map(c => ({ orig: c.name, name: c.name, hint: c.hint })),
+      cols: cur.columns.map(c => ({ orig: c.name, name: c.name, hint: c.hint,id:c.id,is_completion:c.is_completion===true })),
       lanes: cur.lanes.map(c => ({ orig: c.name, name: c.name, hint: c.hint }))
     };
     layoutMsg(''); drawLayout('cols'); drawLayout('lanes'); ldlg.showModal();
   });
   const addRow = (kind, label) => {
     if (draft[kind].length >= 8) return layoutMsg('Up to 8 ' + label + '.');
-    draft[kind].push({ orig: null, name: '', hint: '' }); drawLayout(kind);
+    draft[kind].push({ orig: null, name: '', hint: '',...(kind==='cols'?{id:crypto.randomUUID(),is_completion:false}:{}) }); drawLayout(kind);
   };
   $('wcAddCol').addEventListener('click', () => addRow('cols', 'columns'));
   $('wcAddLane').addEventListener('click', () => addRow('lanes', 'swimlanes'));
@@ -392,7 +396,7 @@
     choose.addEventListener('click', () => {
       const existing = board.getLayout();
       const toDraft = (rows, prior) => rows.map(([name, hint]) => ({
-        name, hint, orig: prior.find(p => p.name.toLowerCase() === name.toLowerCase())?.name || null
+        name, hint, orig: prior.find(p => p.name.toLowerCase() === name.toLowerCase())?.name || null, id:prior.find(p => p.name.toLowerCase() === name.toLowerCase())?.id||crypto.randomUUID(),is_completion:prior.find(p => p.name.toLowerCase() === name.toLowerCase())?.is_completion===true
       }));
       draft = { cols: toDraft(template.columns, existing.columns), lanes: toDraft(template.lanes, existing.lanes) };
       drawLayout('cols'); drawLayout('lanes');
@@ -412,7 +416,7 @@
     if (!canManage || !current || current.role === 'viewer') return;
     const payload = {
       format: '90s6-work-board-layout', version: 1,
-      columns: draft.cols.map(({ name, hint }) => ({ name: name.trim(), hint: hint.trim() })),
+      columns: draft.cols.map(({ name, hint,is_completion }) => ({ name: name.trim(), hint: hint.trim(),is_completion:!!is_completion })),
       lanes: draft.lanes.map(({ name, hint }) => ({ name: name.trim(), hint: hint.trim() }))
     };
     const file = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
@@ -442,7 +446,7 @@
           if (!row || typeof row.name !== 'string' || !row.name.trim() || row.name.length > 30 ||
               (row.hint != null && (typeof row.hint !== 'string' || row.hint.length > 80)))
             throw Error('Invalid ' + label.toLowerCase() + ' name or description.');
-          return { name: row.name.trim(), hint: (row.hint || '').trim() };
+          return { name: row.name.trim(), hint: (row.hint || '').trim(),is_completion:row.is_completion===true };
         });
         if (new Set(result.map(row => row.name.toLowerCase())).size !== result.length)
           throw Error(label + ' names must be unique.');
@@ -453,7 +457,7 @@
       const currentLayout = board.getLayout();
       // Match by name to retain work item placement where possible.
       draft = {
-        cols: cols.map(row => ({ ...row, orig: currentLayout.columns.find(c => c.name.toLowerCase() === row.name.toLowerCase())?.name || null })),
+        cols: cols.map(row => ({ ...row, orig: currentLayout.columns.find(c => c.name.toLowerCase() === row.name.toLowerCase())?.name || null,id:currentLayout.columns.find(c=>c.name.toLowerCase()===row.name.toLowerCase())?.id||crypto.randomUUID(),is_completion:currentLayout.columns.find(c=>c.name.toLowerCase()===row.name.toLowerCase())?.is_completion===true })),
         lanes: lanes.map(row => ({ ...row, orig: currentLayout.lanes.find(c => c.name.toLowerCase() === row.name.toLowerCase())?.name || null }))
       };
       drawLayout('cols'); drawLayout('lanes');
@@ -464,7 +468,7 @@
 
   $('wcLayoutSave').addEventListener('click', async () => {
     if (!canManage || !current || current.role === 'viewer') return;
-    const clean = rows => rows.map(r => ({ orig: r.orig, name: r.name.trim().slice(0, 30), hint: r.hint.trim().slice(0, 80) }));
+    const clean = rows => rows.map(r => ({ orig: r.orig, name: r.name.trim().slice(0, 30), hint: r.hint.trim().slice(0, 80),id:r.id||crypto.randomUUID(),is_completion:r.is_completion===true }));
     const cols = clean(draft.cols), lanes = clean(draft.lanes);
     for (const list of [cols, lanes]) {
       if (list.some(r => !r.name) || new Set(list.map(r => r.name.toLowerCase())).size !== list.length)
@@ -476,8 +480,8 @@
     const wm = mapOf(cols, cur.columns), km = mapOf(lanes, cur.lanes);
     const dropped = tasks.filter(t => !cols.some(r => r.orig === t.when) || !lanes.some(r => r.orig === t.kind)).length;
     if (dropped && !confirm(dropped + ' task(s) sit in a removed column or swimlane and will move to the first one. Continue?')) return;
-    const data = tasks.map(t => ({ ...t, when: wm.get(t.when) || cols[0].name, kind: km.get(t.kind) || lanes[0].name }));
-    const config = { columns: cols.map(r => ({ name: r.name, hint: r.hint })), lanes: lanes.map(r => ({ name: r.name, hint: r.hint })) };
+    const data = tasks.map(t => {const name=wm.get(t.when)||cols[0].name;return {...t,when:name,column_id:cols.find(c=>c.name===name)?.id,kind:km.get(t.kind)||lanes[0].name}});
+    const config = { columns: cols.map(r => ({ name: r.name, hint: r.hint,id:r.id,is_completion:r.is_completion })), lanes: lanes.map(r => ({ name: r.name, hint: r.hint })) };
     layoutMsg('Saving...');
     await flush();
     const res = await sb.from('boards').update({ config, data, updated_at: new Date().toISOString() })

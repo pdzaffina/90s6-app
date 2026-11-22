@@ -22,6 +22,10 @@ Deno.serve(async req=>{
  const selected=String(input.model||"");
  const model=test==="alternate"?selected:String(settings.model);
  if(!/^[a-zA-Z0-9][a-zA-Z0-9_./:-]{1,179}$/.test(model))return reply({error:"Invalid model identifier"},400);
+ const tokenBudget=[64,512,1024].includes(Number(input.tokens))?Number(input.tokens):512;
+ const reasoning=String(input.reasoning||"auto");
+ if(!["auto","low","medium","high"].includes(reasoning))return reply({error:"Invalid reasoning option"},400);
+ if(reasoning!=="auto"&&!model.startsWith("openai/gpt-oss-"))return reply({error:"Explicit reasoning effort is supported here only for GPT-OSS models. Use provider default for this model."},422);
  const timeoutMs=Math.min(60000,Math.max(5000,Number(settings.timeout_ms)||20000));
  const controller=new AbortController(),start=performance.now(),timer=setTimeout(()=>controller.abort(),timeoutMs);
  let headersMs:number|null=null,bodyMs:number|null=null,firstTokenMs:number|null=null;
@@ -30,7 +34,7 @@ Deno.serve(async req=>{
   const response=await fetch(base+(test==="connectivity"?"/models":"/chat/completions"),{
    method:test==="connectivity"?"GET":"POST",signal:controller.signal,
    headers:{"authorization":"Bearer "+key,"content-type":"application/json",...(streaming?{"accept":"text/event-stream"}:{})},
-   ...(test==="connectivity"?{}:{body:JSON.stringify({model,max_tokens:64,messages:[{role:"user",content:"Reply with exactly: OK"}],...(streaming?{stream:true}:{})})})
+   ...(test==="connectivity"?{}:{body:JSON.stringify({model,max_tokens:tokenBudget,...(reasoning!=="auto"?{reasoning_effort:reasoning}:{}),messages:[{role:"user",content:"Reply with exactly: OK"}],...(streaming?{stream:true}:{})})})
   });
   headersMs=Math.round(performance.now()-start);
   let raw="",visible=false,finishReason:null|string=null,completionTokens:null|number=null,reasoningTokens:null|number=null,providerErrorType:null|string=null,providerErrorCode:null|string=null,modelCount:null|number=null;
@@ -71,10 +75,10 @@ Deno.serve(async req=>{
    providerErrorType=payload?.error?.type??null;providerErrorCode=payload?.error?.code??null;
   }
   bodyMs=Math.round(performance.now()-start);
-  const result={test,model,http_status:response.status,headers_ms:headersMs,first_token_ms:firstTokenMs,body_ms:bodyMs,visible_text:visible,finish_reason:finishReason,completion_tokens:completionTokens,reasoning_tokens:reasoningTokens,model_count:modelCount,provider_error_type:providerErrorType,provider_error_code:providerErrorCode};
+  const result={test,model,token_budget:tokenBudget,reasoning_control:reasoning,http_status:response.status,headers_ms:headersMs,first_token_ms:firstTokenMs,body_ms:bodyMs,visible_text:visible,finish_reason:finishReason,completion_tokens:completionTokens,reasoning_tokens:reasoningTokens,model_count:modelCount,provider_error_type:providerErrorType,provider_error_code:providerErrorCode};
   console.info("AI_DIAGNOSTIC",JSON.stringify(result));return reply(result);
  }catch(e){
-  const result={test,model,http_status:null,headers_ms:headersMs,first_token_ms:firstTokenMs,body_ms:bodyMs,elapsed_ms:Math.round(performance.now()-start),timed_out:controller.signal.aborted,error_type:e instanceof Error?e.name:"Unknown"};
+  const result={test,model,token_budget:tokenBudget,reasoning_control:reasoning,http_status:null,headers_ms:headersMs,first_token_ms:firstTokenMs,body_ms:bodyMs,elapsed_ms:Math.round(performance.now()-start),timed_out:controller.signal.aborted,error_type:e instanceof Error?e.name:"Unknown"};
   console.warn("AI_DIAGNOSTIC",JSON.stringify(result));return reply(result);
  }finally{clearTimeout(timer)}
 

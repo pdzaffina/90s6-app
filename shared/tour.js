@@ -68,6 +68,10 @@
   if(!session||!profile){active=false;clear();userId=null;return}
   if(userId===session.user.id)return;
   userId=session.user.id;
+  if(!profile.tour_completed_at && location.pathname==='/' && sessionStorage.getItem('90s6-welcome-viewed:'+userId)!=='yes'){
+   sessionStorage.setItem('90s6-welcome-viewed:'+userId,'yes');
+   location.replace('/training/90s6-introduction/?welcome=1');return;
+  }
   let progress=null;
   try{progress=sessionStorage.getItem(key(userId))}catch(e){}
   if(progress!==null){idx=Math.min(steps.length-1,Math.max(0,Number(progress)||0));active=true;show()}

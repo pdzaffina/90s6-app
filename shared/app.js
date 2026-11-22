@@ -68,6 +68,7 @@
 
   async function handle(s) {
     if (!s) {
+      const signedOutUserId = session?.user?.id;
       session = null; profile = null; state = 'out';
       gate.hidden = false; $('apForm').hidden = false; msg(notice, !!notice); notice = '';
       renderNav(); emit(); return;
@@ -116,7 +117,7 @@
       if (error) throw error;
       session = null; profile = null; state = 'out';
       gate.hidden = false; $('apForm').hidden = false; renderNav(); emit();
-      try { sessionStorage.removeItem('ap-sess'); } catch (e) {}
+      try { sessionStorage.removeItem('ap-sess'); if (signedOutUserId) sessionStorage.removeItem('90s6-intro-launch:'+signedOutUserId); } catch (e) {}
       try {
         Object.keys(localStorage)
           .filter(k => k === 'work-chunks-board-v1' || k.startsWith('wc-'))

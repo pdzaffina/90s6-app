@@ -54,7 +54,7 @@
           btn('Delete', 'danger', () => act('delete_user', { id: u.id }, 'Delete ' + u.email + '? This cannot be undone.'))
         );
       }
-      const pick=el('input',{type:'checkbox',className:'feature-user-check',value:u.id,disabled:u.is_admin});pick.addEventListener('change',()=>window.dispatchEvent(new Event('feature-selection-changed')));
+      const pick=el('input',{type:'checkbox',className:'feature-user-check',value:u.id});pick.addEventListener('change',()=>window.dispatchEvent(new Event('feature-selection-changed')));
       body.append(el('tr', {},
         el('td', {},pick),
         el('td', { textContent: u.email || '' }),
@@ -93,7 +93,7 @@
     try{
       const {data,error}=await App.sb.rpc('global_assign_tenant_members',{p_tenant:tenant,p_users:ids,p_role:role});
       if(error)throw error;
-      msg.textContent=data+' users assigned.';
+      msg.textContent=data+' users assigned. Memberships in other organizations were preserved.';
       await load();
     }catch(e){msg.textContent=e.message;}
     finally{$('assignUsersOrg').disabled=false;}

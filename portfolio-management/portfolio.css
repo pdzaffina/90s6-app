@@ -30,3 +30,6 @@
 /* Expanded shows down; minimized shows up */
 .effort-toggle[aria-expanded="true"] .effort-chevron{transform:translateY(-2px) rotate(45deg)}
 .effort-toggle[aria-expanded="false"] .effort-chevron{transform:translateY(2px) rotate(225deg)}
+
+/* Compact estimates on comparison initiative rows */
+.comparison-initiative-detail{flex:1;min-width:0}.comparison-initiative-detail>strong{display:block;margin-bottom:7px}.comparison-mini-pills{display:flex;flex-wrap:wrap;gap:4px}.comparison-mini-pills .effort-pill{flex:0 0 83px;width:83px;height:22px;padding:0 7px;font-size:10px}.compare-initiative .comparison-mini-pills .effort-label,.compare-initiative .comparison-mini-pills .effort-value{color:#1a2939;white-space:nowrap}

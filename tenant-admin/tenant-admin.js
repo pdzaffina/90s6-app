@@ -30,9 +30,23 @@ async function refresh(){
   const check=document.createElement('input');check.type='checkbox';check.className='tenant-member-check';check.value=p.id;
   check.disabled=m.status!=='active'||p.disabled||p.is_admin;
   check.onchange=count;cell.append(check);tr.append(cell);
-  for(const v of [p.email||m.user_id,p.full_name||'',m.role,m.status]){
+  for(const v of [p.email||m.user_id,p.full_name||'']){
    const td=document.createElement('td');td.textContent=v;tr.append(td);
   }
+  const roleCell=document.createElement('td'),roleSelect=document.createElement('select');
+  roleSelect.className='ap-input';roleSelect.setAttribute('aria-label','Organization role for '+(p.email||p.id));
+  for(const [value,label] of [['user','User'],['superuser','Superuser'],['tenant_admin','Org Admin']])roleSelect.append(option(value,label));
+  roleSelect.value=m.role;
+  roleSelect.disabled=p.is_admin||p.disabled;
+  roleSelect.onchange=async()=>{
+    const previous=m.role;roleSelect.disabled=true;
+    const {error}=await sb.rpc('tenant_set_member',{p_tenant:tenant,p_user:p.id,p_role:roleSelect.value,p_status:m.status});
+    if(error){roleSelect.value=previous;status(error.message);}
+    else{m.role=roleSelect.value;status('Updated organization role for '+p.email);}
+    roleSelect.disabled=p.is_admin||p.disabled;
+  };
+  roleCell.append(roleSelect);tr.append(roleCell);
+  const stateCell=document.createElement('td');stateCell.textContent=m.status;tr.append(stateCell);
   $('tenantAdminRows').append(tr);
  }
  $('tenantMemberUser').replaceChildren(option('','Select an organization member'));

@@ -46,6 +46,31 @@ async function refresh(){
   wrapper.append(input,document.createTextNode(' '+label+(input.disabled?' (organization disabled)':'')));
   $('tenantFeatureOptions').append(wrapper);
  }
+ const {data:matrix,error:matrixError}=await sb.rpc('tenant_member_feature_matrix',{p_tenant:tenant});
+ if(matrixError)throw matrixError;
+ const grantMap=new Map((matrix||[]).map(r=>[r.user_id+':'+r.feature,r.enabled]));
+ const head=$('tenantAccessHead');head.replaceChildren();
+ const first=document.createElement('th');first.textContent='User';head.append(first);
+ for(const [,label] of features){const th=document.createElement('th');th.textContent=label;head.append(th);}
+ const body=$('tenantAccessRows');body.replaceChildren();
+ for(const m of members||[]){
+  const p=map.get(m.user_id);if(!p)continue;
+  const row=document.createElement('tr'),name=document.createElement('td');
+  name.textContent=(p.email||p.full_name||p.id)+(m.status!=='active'?' (Inactive)':'');
+  row.append(name);
+  for(const [key] of features){
+   const cell=document.createElement('td'),tag=document.createElement('span');
+   const globallyOn=current.is_admin&&p.is_admin;
+   const orgOff=access.organization?.[key]===false;
+   const userOff=grantMap.get(p.id+':'+key)===false;
+   const off=m.status!=='active'||p.disabled||orgOff||userOff;
+   tag.className='ap-tag'+(off?' off':'');
+   tag.textContent=globallyOn?'Always on':off?'Off':'On';
+   if(off)tag.title=m.status!=='active'||p.disabled?'Account or membership inactive':orgOff?'Disabled for organization':'Disabled for user';
+   cell.append(tag);row.append(cell);
+  }
+  body.append(row);
+ }
  count();
  status('Managing '+(App.tenantMemberships.find(m=>m.tenant_id===tenant)?.tenants?.name||'organization'));
 }
@@ -62,7 +87,7 @@ async function apply(enabled){
  const ids=selected(),keys=[...$('tenantFeatureOptions').querySelectorAll('input:checked')].map(c=>c.value);
  if(!ids.length||!keys.length){$('tenantFeatureStatus').textContent='Select members and applications.';return;}
  const buttons=[$('tenantFeaturesOn'),$('tenantFeaturesOff')];buttons.forEach(b=>b.disabled=true);
- try{const {data,error}=await sb.rpc('manage_tenant_features',{p_tenant:tenant,p_users:ids,p_features:keys,p_enabled:enabled});if(error)throw error;$('tenantFeatureStatus').textContent=data+' application assignments saved.';}
+ try{const {data,error}=await sb.rpc('manage_tenant_features',{p_tenant:tenant,p_users:ids,p_features:keys,p_enabled:enabled});if(error)throw error;$('tenantFeatureStatus').textContent=data+' application assignments saved.';await refresh();}
  catch(e){$('tenantFeatureStatus').textContent=e.message;}
  finally{buttons.forEach(b=>b.disabled=false);}
 }

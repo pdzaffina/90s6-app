@@ -113,7 +113,7 @@
     ]);
     if (b.error || m.error) throw (b.error || m.error);
     const roles = new Map(m.data.map(r => [r.board_id, r.role]));
-    boards = b.data.map(x => ({ ...x, role: x.owner_id === user.id ? 'owner' : (roles.get(x.id) || 'viewer') }));
+    boards = b.data.map(x => ({ ...x, role: (App.isTenantAdmin() || x.owner_id === user.id) ? 'owner' : (roles.get(x.id) || 'viewer') }));
   }
 
   async function openBoard(id, skipFlush) {

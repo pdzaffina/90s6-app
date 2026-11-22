@@ -74,6 +74,7 @@
 .ai-assisted-pill{display:inline-flex;align-items:center;vertical-align:middle;gap:3px;padding:2px 6px;border:1px solid #c9a9f4;border-radius:999px;background:#f1e7ff;color:#7134a8;font-size:9px;font-weight:750;line-height:1.15;letter-spacing:.01em;text-transform:lowercase;white-space:nowrap}
 .ai-assisted-pill[hidden]{display:none!important}
 
-.ai-assisted-glyph{font-size:10px;line-height:1;display:inline-block}
+.ainbox .ainbox-ai-heading>span>.ai-assisted-pill{font-size:13px;font-weight:800;line-height:1.15;margin-right:0;padding:2px 6px;gap:4px}
+.ai-assisted-glyph{width:12px;height:12px;flex:none;display:inline-block}
 .ainbox .ainbox-ai-disclaimer{margin:-9px 0 13px 2px;font-size:11px;line-height:1.4;color:var(--muted,#68788c)}
 .ainbox .ainbox-ai-disclaimer[hidden]{display:none!important}

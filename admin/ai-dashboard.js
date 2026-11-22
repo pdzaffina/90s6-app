@@ -80,14 +80,24 @@ $('auditExport').onclick=async()=>{
 async function loadGovernance(){
  try{
   const [policy,access]=await Promise.all([rpc('ai_policy_get'),rpc('ai_audit_access_recent',{p_limit:30})]);
-  $('retentionDays').value=policy.payload_retention_days;$('redactExport').checked=policy.redact_export;
+  $('retainForever').checked=Number(policy.payload_retention_days)===0;
+  $('retentionDays').value=Number(policy.payload_retention_days)===0?90:policy.payload_retention_days;
+  $('retentionDays').disabled=$('retainForever').checked;
+  $('purgeNow').disabled=$('retainForever').checked;
+  $('redactExport').checked=policy.redact_export;
   const target=$('auditAccess');target.replaceChildren();
   if(!access.length)target.textContent='No audit access recorded yet.';
   for(const a of access){const line=document.createElement('p');line.textContent=new Date(a.occurred_at).toLocaleString()+' · '+a.action+' · '+a.actor_id+(a.audit_id?' · '+a.audit_id:'');target.append(line)}
  }catch(e){$('governanceStatus').textContent='Governance unavailable: '+e.message}
 }
+$('retainForever').onchange=()=>{
+ const forever=$('retainForever').checked;
+ $('retentionDays').disabled=forever;
+ $('purgeNow').disabled=forever;
+ $('governanceStatus').textContent=forever?'Save the policy to retain AI audit payloads indefinitely.':'Save the policy to apply the selected retention period.';
+};
 $('governanceForm').onsubmit=async e=>{
- e.preventDefault();const days=Number($('retentionDays').value);
+ e.preventDefault();const days=$('retainForever').checked?0:Number($('retentionDays').value);
  try{await rpc('ai_policy_set',{p_days:days,p_redact:$('redactExport').checked});$('governanceStatus').textContent='Policy saved. Apply retention to purge old payloads now.';await loadGovernance()}
  catch(err){$('governanceStatus').textContent=err.message}
 };

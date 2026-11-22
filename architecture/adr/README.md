@@ -9,3 +9,12 @@ These initial records describe decisions inferred from the repository and should
 - [0002 Multi-tenant isolation](0002-multi-tenant-data-isolation.md)
 - [0003 Role and feature authorization](0003-role-and-feature-authorization.md)
 - [0004 JSONB work boards](0004-jsonb-work-board-model.md)
+
+## Action Inbox decisions
+
+- [0005 Exception-oriented design](0005-action-inbox-exception-oriented-design.md)
+- [0006 Typed source contracts and Unknown](0006-action-inbox-source-contracts.md)
+- [0007 Tenant and source authorization](0007-action-inbox-tenant-security.md)
+- [0008 Explicit-record reconciliation](0008-action-inbox-reconciliation.md)
+- [0009 Item-level Done status](0009-action-inbox-item-status-completion.md)
+- [0010 Versioned rules and scan operations](0010-action-inbox-rule-versions-and-operations.md)

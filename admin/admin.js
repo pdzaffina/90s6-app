@@ -102,6 +102,13 @@
     $('bulkMsg').textContent = message;
     $('bulkMsg').className = 'ap-msg' + (error ? ' err' : '');
   };
+  $('bulkTemplate').addEventListener('click', () => {
+    const csv = 'email,full_name,password,role,active\r\n';
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+    const a = el('a', { href: url, download: '90s6-bulk-users-template.csv' });
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  });
   $('bulkCsv').addEventListener('change', async () => {
     bulkUsers = []; $('bulkCreate').disabled = true;
     $('bulkRows').replaceChildren(); $('bulkPreview').hidden = true;

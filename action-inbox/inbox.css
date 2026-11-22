@@ -33,3 +33,5 @@
 .ainbox-rules .ainbox-rule-buttons button:focus-visible{outline:3px solid #7cb7e4;outline-offset:2px}
 .ainbox-rules .ainbox-rule-buttons button:disabled{opacity:.45;box-shadow:none}
 .ainbox-rules .ainbox-rule-buttons button span{font-size:13px;line-height:1}
+
+.ainbox-rule-fields select{width:100%;min-width:0;padding:11px 12px;border:1px solid #cddbe8;border-radius:9px;background:#fff;color:#172c43;font-size:14px;cursor:pointer}.ainbox-rule-fields select:focus-visible{outline:2px solid #6aa2cf;outline-offset:1px}

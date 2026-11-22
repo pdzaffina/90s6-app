@@ -98,6 +98,26 @@ async function renderDetail(x){
   const steps=plan?.steps||[];
   body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. Completing steps does not resolve the exception until a verified scan confirms compliance.</p><p>Plan status: <strong>'+esc(plan?.status||'Not created')+'</strong></p><label>Remediation steps (one per line)<textarea id="ainboxSteps" rows="5" maxlength="10000" placeholder="Describe the steps to restore compliance"></textarea></label><div class="actions"><button type="button" id="ainboxSavePlan">Save plan</button><button type="button" id="ainboxApprovePlan">Approve plan</button></div><div id="ainboxStepChecklist"></div></div>';
   $('ainboxSteps').value=steps.map(z=>z.description).join('\n');
+  const aiPlanBar=document.createElement('div');aiPlanBar.style.cssText='margin:12px 0;padding:12px;border:1px solid var(--border,#ccd5df);border-radius:8px;display:grid;gap:8px';
+  aiPlanBar.innerHTML='<strong>✦ AI-assisted remediation planning</strong><button type="button" id="ainboxGeneratePlan">Generate suggested steps</button><small id="ainboxAiPlanStatus">Generated steps are editable. Save the plan to persist changes; approval remains separate.</small>';
+  $('ainboxSteps').closest('label').before(aiPlanBar);
+  try{const {data:enabled,error:enabledError}=await sb.rpc('ainbox_ai_component_enabled',{p_key:'remediation_plan'});aiPlanBar.hidden=!!enabledError||enabled!==true;}catch{aiPlanBar.hidden=true}
+  $('ainboxGeneratePlan').onclick=async()=>{
+   const button=$('ainboxGeneratePlan'),status=$('ainboxAiPlanStatus'),field=$('ainboxSteps');
+   if(field.value.trim()&&!confirm('Replace the current remediation steps with AI suggestions? Unsaved edits will be lost.'))return;
+   button.disabled=true;status.textContent='Generating suggested corrective actions…';
+   try{
+    const {data,error}=await sb.functions.invoke('ainbox-ai-remediation',{body:{tenant_id:tenant,exception_id:x.id}});
+    if(error){let message=data?.error||error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
+    if(data?.error)throw Error(data.error);
+    if(selected!==x.id||detailTab!=='remediation')return;
+    if(!Array.isArray(data.steps)||!data.steps.length)throw Error('No remediation steps returned');
+    field.value=data.steps.join('\\n');
+    status.textContent='Suggested steps ready. Review, edit, then Save plan to persist. No steps have been approved or completed.';
+   }catch(e){status.textContent='AI planning unavailable: '+e.message}
+   finally{button.disabled=false}
+  };
+
   $('ainboxSavePlan').onclick=async()=>{try{const values=$('ainboxSteps').value.split('\n').map(t=>t.trim()).filter(Boolean);await rpc('ainbox_save_remediation',{p_tenant:tenant,p_exception:x.id,p_steps:values});renderDetail(x)}catch(e){msg(e.message,'error')}};
   $('ainboxApprovePlan').disabled=!allowedAdmin()||!plan||plan.status!=='proposed';
   $('ainboxApprovePlan').onclick=async()=>{try{await rpc('ainbox_approve_remediation',{p_tenant:tenant,p_plan:plan.id,p_revision:plan.revision});renderDetail(x)}catch(e){msg(e.message,'error')}};

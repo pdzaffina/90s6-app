@@ -25,5 +25,11 @@ $('pwForm').addEventListener('submit', async e => {
  $('pwMsg').className = 'ap-msg' + (error ? ' err' : '');
  if (!error) { $('newPass').value = ''; if (window.AppTour) window.AppTour.finish(); }
 });
+$('resetPresentation').addEventListener('click', async () => {
+ if (!userId) return;
+ const {error}=await App.sb.from('profiles').update({intro_presentation_completed_at:null}).eq('id',userId);
+ $('presentationMsg').textContent=error?error.message:'Presentation reset. It will appear when you next sign in.';
+ $('presentationMsg').className='ap-msg'+(error?' err':'');
+});
 $('replayTour').addEventListener('click', () => { if(window.AppTour) window.AppTour.restart(); });
 })();

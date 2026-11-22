@@ -78,6 +78,28 @@ function render(){
  $('ainboxList').querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.id;detailTab='remediation';render()}));
  renderDetail(list.find(x=>x.id===selected));
 }
+async function attachAdvisory(feature,panel,x){
+ const button=panel.querySelector('button'),output=panel.querySelector('p:last-child');
+ try{
+  const {data:enabled,error}=await sb.rpc('ainbox_ai_component_enabled',{p_key:feature});
+  if(error||enabled!==true){panel.hidden=true;return}
+  const saved=await rpc('ainbox_ai_advisory_get',{p_tenant:tenant,p_exception:x.id,p_component:feature});
+  if(saved?.body)output.textContent=saved.body+'\n\nGenerated '+new Date(saved.generated_at).toLocaleString();
+ }catch{panel.hidden=true;return}
+ button.onclick=async()=>{
+  button.disabled=true;output.textContent='Reviewing available evidence…';
+  try{
+   const {data,error}=await sb.functions.invoke('ainbox-ai-'+feature,{body:{tenant_id:tenant,exception_id:x.id}});
+   if(error){let message=error.message;try{const payload=await error.context?.json();message=payload?.error||message}catch{}throw Error(message)}
+   if(data?.error)throw Error(data.error);
+   if(selected!==x.id)return;
+   await rpc('ainbox_ai_advisory_save',{p_tenant:tenant,p_exception:x.id,p_component:feature,p_subject:data.subject||'',p_body:data.body});
+   output.textContent=data.body+'\n\nGenerated '+new Date().toLocaleString();
+  }catch(e){output.textContent='AI review unavailable: '+e.message}
+  finally{button.disabled=false}
+ };
+}
+
 async function renderDetail(x){
  const el=$('ainboxDetail');
  if(!x){el.innerHTML='<h2>No exception selected</h2><p>No exceptions match the current workstream and filters. Select another workstream or adjust the filters to review an exception.</p>';return}
@@ -98,6 +120,9 @@ async function renderDetail(x){
   const steps=plan?.steps||[];
   body.innerHTML='<div class="section"><h3>Guided remediation</h3><p>Correct the issue in the source application. Completing steps does not resolve the exception until a verified scan confirms compliance.</p><p>Plan status: <strong>'+esc(plan?.status||'Not created')+'</strong></p><label>Remediation steps (one per line)<textarea id="ainboxSteps" rows="5" maxlength="10000" placeholder="Describe the steps to restore compliance"></textarea></label><div class="actions"><button type="button" id="ainboxSavePlan">Save plan</button><button type="button" id="ainboxApprovePlan">Approve plan</button></div><div id="ainboxStepChecklist"></div></div>';
   $('ainboxSteps').value=steps.map(z=>z.description).join('\n');
+  const verifyPanel=document.createElement('div');verifyPanel.className='section';verifyPanel.innerHTML='<h3>AI resolution review</h3><p>Advisory only. Source scans remain authoritative for closure.</p><button type="button" id="ainboxAiVerificationGenerate">Review closure evidence</button><p id="ainboxAiVerificationResult" style="white-space:pre-wrap"></p>';body.append(verifyPanel);
+  await attachAdvisory('verification',verifyPanel,x);
+
   const aiPlanBar=document.createElement('div');aiPlanBar.style.cssText='margin:12px 0;padding:12px;border:1px solid var(--border,#ccd5df);border-radius:8px;display:grid;gap:8px';
   aiPlanBar.innerHTML='<strong>✦ AI-assisted remediation planning</strong><button type="button" id="ainboxGeneratePlan">Generate suggested steps</button><small id="ainboxAiPlanStatus">Generated steps are editable. Save the plan to persist changes; approval remains separate.</small>';
   $('ainboxSteps').closest('label').before(aiPlanBar);
@@ -127,6 +152,9 @@ async function renderDetail(x){
   
  }else if(detailTab==='activity'){
   body.innerHTML='<div class="section"><h3>Activity history</h3>'+(detail.activity||[]).map(a=>'<p>'+esc(a.event_type.replaceAll('_',' '))+' · '+esc(date(a.occurred_at))+'</p>').join('')+'</div>';
+  const historyPanel=document.createElement('div');historyPanel.className='section';historyPanel.innerHTML='<h3>AI exception history</h3><button type="button" id="ainboxAiHistoryGenerate">Analyze history</button><p id="ainboxAiHistoryResult" style="white-space:pre-wrap"></p>';body.append(historyPanel);
+  await attachAdvisory('history',historyPanel,x);
+
  }else{
   const c=detail.communication||{};
   body.innerHTML='<div class="section"><h3>Communication draft</h3><label>Recipient<input id="ainboxRecipient" maxlength="500"></label><label>Subject<input id="ainboxSubject" maxlength="300"></label><label>Message<textarea id="ainboxBody" maxlength="20000"></textarea></label><div class="actions"><button type="button" id="ainboxSaveComm">Save draft</button><button type="button" id="ainboxApproveComm">Approve</button><button type="button" id="ainboxRecordComm">Record delivery</button></div><p id="ainboxCommStatus"></p><small>Approval and recording delivery are separate. No automatic messages are sent.</small></div>';

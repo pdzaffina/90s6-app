@@ -42,12 +42,12 @@ create trigger ainbox_assessment_actor before insert or update on public.pm_init
  for each row execute function public.ainbox_set_assessment_actor();
 create or replace function public.ainbox_audit_assessment() returns trigger language plpgsql set search_path='' as $$
 begin
- if new.assessment_completed_at is distinct from old.assessment_completed_at then
+ if (tg_op='INSERT' and new.assessment_completed_at is not null) or (tg_op='UPDATE' and new.assessment_completed_at is distinct from old.assessment_completed_at) then
    insert into public.audit_log(actor_id,action,target,detail) values(auth.uid(),'portfolio_assessment_status',new.id::text,jsonb_build_object('portfolio_id',new.portfolio_id,'completed',new.assessment_completed_at is not null));
  end if;
  return new;
 end $$;
 revoke all on function public.ainbox_audit_assessment() from public,anon,authenticated;
-create trigger ainbox_portfolio_assessment_audit after update on public.pm_initiatives
+create trigger ainbox_portfolio_assessment_audit after insert or update on public.pm_initiatives
  for each row execute function public.ainbox_audit_assessment();
 commit;

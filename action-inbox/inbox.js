@@ -198,7 +198,7 @@ document.querySelectorAll('.ainbox-tabs button').forEach(b=>b.onclick=()=>setTab
 $('ainboxRefresh').onclick=()=>tab==='rules'?loadRules():load();
 $('ainboxGenerateAI').onclick=async()=>{
  const button=$('ainboxGenerateAI'),output=$('ainboxAIText');
- const scope=aiScope,request=++aiRequest;
+ const scope=aiScope,request=++aiRequest,previous=aiCache;
  button.disabled=true;button.textContent='Generating…';
  output.textContent='Reviewing your accessible exception summary…';$('ainboxAiBadge').hidden=true;$('ainboxAiStale').hidden=true;$('ainboxAiDisclaimer').hidden=true;
  try{
@@ -211,7 +211,7 @@ $('ainboxGenerateAI').onclick=async()=>{
   displayCachedAI(record);
   const {error:saveError}=await sb.from('ainbox_ai_assessment_cache').upsert(record,{onConflict:'user_id,tenant_id,scope_key'});
   if(saveError)msg('Assessment generated, but could not be saved for later: '+saveError.message,'warning');
- }catch(e){if(scope===aiScope&&request===aiRequest)output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}
+ }catch(e){if(scope===aiScope&&request===aiRequest){if(previous){displayCachedAI(previous);msg('New AI assessment unavailable: '+e.message+' Showing the previously saved assessment.','warning');}else output.textContent='AI assessment unavailable: '+e.message+' The deterministic assessment above is still available.';}}
  finally{button.disabled=false;button.textContent='Generate assessment';}
 };
 $('ainboxScan').onclick=loadRules;

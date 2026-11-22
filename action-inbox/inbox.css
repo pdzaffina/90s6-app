@@ -75,4 +75,5 @@
 .ai-assisted-pill[hidden]{display:none!important}
 
 .ai-assisted-glyph{font-size:10px;line-height:1;display:inline-block}
-.ainbox-ai-disclaimer{margin:7px 0 0;font-size:11px;line-height:1.4;color:var(--muted,#68788c)}
+.ainbox .ainbox-ai-disclaimer{margin:-9px 0 13px 2px;font-size:11px;line-height:1.4;color:var(--muted,#68788c)}
+.ainbox .ainbox-ai-disclaimer[hidden]{display:none!important}

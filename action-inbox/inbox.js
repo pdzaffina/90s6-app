@@ -13,7 +13,7 @@ async function load(){
   const [w,a]=await Promise.all([rpc('ainbox_get_workstreams',{p_tenant:tenant}),rpc('ainbox_get_actions',{p_tenant:tenant,p_all:tab==='all'})]);
   workstreams=Array.isArray(w)?w:[];items=Array.isArray(a)?a:[];
   const sel=$('ainboxWorkstream'),old=sel.value;sel.replaceChildren(new Option('All workstreams',''),...workstreams.map(x=>new Option(x.name,x.id)));sel.value=workstreams.some(x=>x.id===old)?old:'';
-  if(!items.some(x=>x.id===selected))selected=items[0]?.id||null;
+  // Selection is reconciled against the visible filtered list in render().
   msg('');render();
  }catch(e){msg('Could not load Action Inbox: '+e.message,'error');items=[];render()}
 }
@@ -26,6 +26,7 @@ function filtered(){
 }
 function render(){
  const list=filtered(),w=workstreams.find(x=>x.id===$('ainboxWorkstream').value);
+ if(!list.some(x=>x.id===selected)){selected=list[0]?.id||null;detailTab='remediation';}
  $('ainboxWorkstreamTitle').textContent=w?.name||'All workstreams';
  $('ainboxOutcome').textContent=w?.desired_outcome||'Review actionable exceptions across your workstreams.';
  $('ainboxHealth').textContent=w?.health_status||'Insufficient Data';
@@ -33,11 +34,11 @@ function render(){
  $('ainboxProgress').textContent=list.filter(x=>x.status==='in_progress').length;$('ainboxListCount').textContent=list.length+' results';
  $('ainboxList').innerHTML=list.length?list.map(x=>`<button type="button" class="ainbox-item" data-id="${esc(x.id)}" aria-pressed="${x.id===selected}"><span class="top"><small>${esc(x.workstream)} · ${esc(x.rule_key)}</small><span class="ainbox-pill">${esc(x.status.replaceAll('_',' '))}</span></span><strong>${esc(x.title||x.rule_name)}</strong><p>${esc(x.summary||'A business rule requires attention.')}</p><small>Priority ${esc(x.priority_score)} · Detected ${esc(date(x.first_detected_at))}</small></button>`).join(''):'<div class="ainbox-empty">No exceptions match your filters. Check the last completed scan or adjust your filters.</div>';
  $('ainboxList').querySelectorAll('[data-id]').forEach(b=>b.addEventListener('click',()=>{selected=b.dataset.id;detailTab='remediation';render()}));
- renderDetail(items.find(x=>x.id===selected));
+ renderDetail(list.find(x=>x.id===selected));
 }
 async function renderDetail(x){
  const el=$('ainboxDetail');
- if(!x){el.innerHTML='<h2>Choose an exception</h2><p>Review evidence, next steps and verification here.</p>';return}
+ if(!x){el.innerHTML='<h2>No exception selected</h2><p>No exceptions match the current workstream and filters. Select another workstream or adjust the filters to review an exception.</p>';return}
  const url=x.source_type==='work_board'?'/work-board/':x.source_type==='portfolio'?'/portfolio-management/':'/content-studio/';
  el.innerHTML=`<div class="meta">${esc(x.workstream)} / ${esc(x.rule_key)}</div><h2>${esc(x.title||x.rule_name)}</h2><div class="meta">Priority ${esc(x.priority_score)} · ${esc(x.status)} · Last detected ${esc(date(x.last_detected_at))}</div><div class="section"><h3>Why this matters</h3><p>${esc(x.summary||'This item is outside the configured business rule.')}</p></div><div class="section"><h3>Next action</h3><p>${esc(x.next_action||'Open the source record and correct the condition.')}</p></div>
  <div class="actions"><a href="${url}" class="ainbox-pill">Open source application</a><button type="button" id="ainboxProgressAction" ${x.status==='resolved'?'disabled':''}>Mark in progress</button><button type="button" id="ainboxSnooze" ${x.status==='resolved'?'disabled':''}>Snooze 1 day</button><button type="button" id="ainboxDismiss" ${x.status==='resolved'?'disabled':''}>Dismiss</button></div>
@@ -49,7 +50,7 @@ async function renderDetail(x){
  body.textContent='Loading…';
  try{
  const detail=await rpc('ainbox_get_exception_detail',{p_tenant:tenant,p_id:x.id});
- if(selected!==x.id)return;
+ if(selected!==x.id||!filtered().some(item=>item.id===x.id))return;
  if(detailTab==='remediation'){
   const plan=(detail.remediation||[])[0];
   const steps=plan?.steps||[];
@@ -75,7 +76,7 @@ async function renderDetail(x){
   $('ainboxRecordComm').disabled=!c.id||c.status!=='approved';
   $('ainboxRecordComm').onclick=async()=>{const channel=prompt('Delivery channel: email, chat, phone, meeting, other','email');if(channel===null)return;const reference=prompt('Delivery reference or note (optional)','');if(reference===null)return;try{await rpc('ainbox_record_communication',{p_tenant:tenant,p_communication:c.id,p_version:c.version,p_channel:channel,p_reference:reference});renderDetail(x)}catch(e){msg(e.message,'error')}};
  }
- }catch(e){body.textContent='Could not load details: '+e.message}
+ }catch(e){if(selected===x.id&&filtered().some(item=>item.id===x.id))body.textContent='Could not load details: '+e.message}
 }
 async function change(x,status,until){
  try{await rpc('ainbox_set_exception_state',{p_tenant:tenant,p_id:x.id,p_status:status,p_revision:x.revision,p_snoozed_until:until||null});await load()}

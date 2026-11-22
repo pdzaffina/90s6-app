@@ -87,8 +87,8 @@
         if (field.trim()) throw new Error('Invalid CSV quoting.');
         quoted = true;
       } else if (c === ',') { row.push(field); field = ''; }
-      else if (c === '\\n' || c === '\\r') {
-        if (c === '\\r' && input[i + 1] === '\\n') i++;
+      else if (c === '\n' || c === '\r') {
+        if (c === '\r' && input[i + 1] === '\n') i++;
         row.push(field); field = '';
         if (row.some(v => v.trim())) rows.push(row);
         row = [];
@@ -108,7 +108,7 @@
     const file = $('bulkCsv').files[0]; if (!file) return;
     try {
       if (file.size > 256 * 1024) throw new Error('CSV must be under 256 KB.');
-      const rows = parseCsv((await file.text()).replace(/^\\uFEFF/, ''));
+      const rows = parseCsv((await file.text()).replace(/^\uFEFF/, ''));
       const header = (rows.shift() || []).map(x => x.trim().toLowerCase());
       for (const name of ['email', 'full_name', 'password', 'role', 'active']) {
         if (!header.includes(name)) throw new Error('Missing CSV column: ' + name);
@@ -120,10 +120,11 @@
         const u = Object.fromEntries(header.map((key, j) => [key, values[j]]));
         u.email = u.email.trim().toLowerCase();
         u.full_name = u.full_name.trim(); u.role = u.role.trim().toLowerCase(); u.active = u.active.trim().toUpperCase();
-        if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(u.email)) throw new Error('Invalid email on row ' + (i + 2));
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(u.email)) throw new Error('Invalid email on row ' + (i + 2));
         if (seen.has(u.email)) throw new Error('Duplicate email on row ' + (i + 2));
         if (!['user', 'superuser', 'admin'].includes(u.role)) throw new Error('Invalid role on row ' + (i + 2));
-        if (!['Y', 'N'].includes(u.active)) throw new Error('Active must be Y or N on row ' + (i + 2));\n        if (u.password && u.password.length < 12) throw new Error('Password must be at least 12 characters when supplied on row ' + (i + 2));
+        if (!['Y', 'N'].includes(u.active)) throw new Error('Active must be Y or N on row ' + (i + 2));
+        if (u.password && u.password.length < 12) throw new Error('Password must be at least 12 characters when supplied on row ' + (i + 2));
         seen.add(u.email); return u;
       });
       bulkUsers.forEach(u => $('bulkRows').append(el('tr', {},

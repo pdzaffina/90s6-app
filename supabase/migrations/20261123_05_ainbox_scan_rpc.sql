@@ -28,6 +28,7 @@ begin
        end if;
        begin due_date:=(item->>'due')::date;exception when others then unknowns:=unknowns+1;continue;end;
        if jsonb_typeof(board_columns)<>'array' or nullif(item->>'column_id','') is null then unknowns:=unknowns+1;continue;end if;
+       if not exists(select 1 from jsonb_array_elements(board_columns) cc where cc->>'is_completion'='true') then unknowns:=unknowns+1;continue;end if;
        col_id:=item->>'column_id';col:=null;
        select value into col from jsonb_array_elements(board_columns) where value->>'id'=col_id limit 1;
        if col is null then unknowns:=unknowns+1;continue;end if;

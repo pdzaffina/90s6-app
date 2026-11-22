@@ -2,7 +2,7 @@
 const $=id=>document.getElementById(id);
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data};
 const money=v=>'$'+Number(v||0).toFixed(4);
-let auditRows=[];let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};
+let auditRows=[];let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};let judgeProposalId=null;
 async function load(){
  if(!authorized)return;
  $('error').textContent='';
@@ -152,7 +152,8 @@ $('evalRun').onclick=async()=>{
  const button=$('evalRun');button.disabled=true;$('evalStatus').textContent='Running two audited model comparisons...';
  try{
   const original=await rpc('ai_replay_source',{p_usage:source});if(!original)throw Error('Source request not available');
-  evaluationRuns={A:null,B:null};
+  evaluationRuns={A:null,B:null};judgeProposalId=null;
+  $('judgeProposal').hidden=true;$('judgeRun').disabled=true;$('judgeStatus').textContent='Running both models...';
   let failures=0;
   for(const [model,output,meta,slot] of [[a,'evalOutputA','evalMetaA','A'],[b,'evalOutputB','evalMetaB','B']]){
    $(output).textContent='Running '+model+'...';
@@ -162,9 +163,55 @@ $('evalRun').onclick=async()=>{
     $(output).textContent=result.content;$(meta).textContent=model+' · '+(performance.now()-t).toFixed(0)+' ms · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · '+result.usage_id;
    }catch(e){failures++;$(output).textContent='Failed: '+e.message;$(meta).textContent=model+' · Failed'}
   }
+  $('judgeRun').disabled=failures!==0;
+  $('judgeStatus').textContent=failures===0?'Both outputs ready. Click Suggest ratings with AI.':'AI rating requires two successful outputs.';
   $('evalStatus').textContent=failures===0?'Comparison complete. Evaluate both responses for quality.':failures===2?'Comparison failed: neither model returned a response.':'Comparison incomplete: one model failed. Choose another chat model and retry.';await loadAudit();
  }catch(e){$('evalStatus').textContent='Comparison failed: '+e.message}
  finally{button.disabled=false}
+};
+function parseJudgeSuggestion(raw){
+ const cleaned=String(raw||'').trim().replace(/^\x60\x60\x60(?:json)?\\s*/i,'').replace(/\\s*\x60\x60\x60$/,'');
+ const obj=JSON.parse(cleaned);
+ if(!obj||typeof obj!=='object')throw Error('AI returned no structured assessment');
+ for(const side of ['a','b']){
+  if(!obj[side]||!['accuracy','completeness','actionability'].every(k=>Number.isInteger(obj[side][k])&&obj[side][k]>=1&&obj[side][k]<=5))throw Error('AI returned invalid scores');
+ }
+ return obj;
+}
+function showJudgeSuggestion(proposal,accepted=false){
+ const score=side=>{
+  const x=proposal[side];return 'Accuracy '+x.accuracy+'/5 · Completeness '+x.completeness+'/5 · Actionability '+x.actionability+'/5'+(x.reason?'\n'+x.reason:'');
+ };
+ $('judgeA').textContent=score('a');$('judgeB').textContent=score('b');
+ $('judgeRecommendation').textContent='Recommendation: '+String(proposal.recommendation||'Review both responses');
+ $('judgeLimitations').textContent=proposal.limitations?'Limitations: '+String(proposal.limitations):'';
+ $('judgeProposal').hidden=false;$('judgeAgree').disabled=accepted;
+ $('judgeAgree').textContent=accepted?'Evaluation accepted':'I agree with this evaluation';
+ $('judgeAccepted').textContent=accepted?'Your agreement was saved. Both model scores are now recorded.':'Review the AI suggestions before accepting.';
+}
+$('judgeRun').onclick=async()=>{
+ const a=evaluationRuns.A,b=evaluationRuns.B;
+ if(!a||!b){$('judgeStatus').textContent='Run both models successfully first.';return}
+ const button=$('judgeRun');button.disabled=true;$('judgeStatus').textContent='AI judge is reviewing the original request and both responses...';
+ try{
+  const pair=await rpc('ai_evaluation_pair',{p_a:a,p_b:b});
+  const result=await invokeGateway({tenant_id:pair.tenant_id,component:'evaluation_judge',usage_a:a,usage_b:b});
+  const proposal=parseJudgeSuggestion(result.content);
+  judgeProposalId=await rpc('ai_evaluation_propose',{p_a:a,p_b:b,p_judge:result.usage_id,p_proposal:proposal});
+  showJudgeSuggestion(proposal,false);
+  $('judgeStatus').textContent='AI suggestions ready. Review before agreeing. Judge: '+result.model+' · Audit '+result.usage_id;
+ }catch(e){$('judgeStatus').textContent='AI evaluation failed: '+e.message}
+ finally{button.disabled=false}
+};
+$('judgeAgree').onclick=async()=>{
+ if(!judgeProposalId)return;
+ const button=$('judgeAgree');button.disabled=true;
+ try{
+  await rpc('ai_evaluation_agree',{p_id:judgeProposalId});
+  button.textContent='Evaluation accepted';
+  $('judgeAccepted').textContent='Agreement saved. Both suggested ratings were recorded under your account.';
+  await loadModelRatings();
+ }catch(e){button.disabled=false;$('judgeAccepted').textContent='Could not save agreement: '+e.message}
 };
 async function loadModelRatings(){
  try{

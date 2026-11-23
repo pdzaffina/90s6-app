@@ -30,7 +30,7 @@ Deno.serve(async(req)=>{
   sb.rpc("ainbox_get_actions",{p_tenant:tenant,p_all:false})
  ]);
  if(work.error||actions.error)return respond({error:"Action Inbox access denied or data unavailable"},403);
- const {data:settings,error:settingsError}=await sb.rpc("ainbox_ai_runtime_settings",{p_tenant:tenant});
+ const {data:settings,error:settingsError}=await sb.rpc("ainbox_ai_runtime_settings",{p_tenant:tenant,p_component:"assessment"});
  if(settingsError)return respond({error:"AI configuration unavailable"},503);
  if(settings?.enabled===false)return respond({error:"AI is disabled by the global administrator"},403);
  const {data:componentEnabled,error:componentError}=await sb.rpc("ainbox_ai_component_enabled",{p_key:"assessment"});

@@ -239,12 +239,30 @@ const renderRows=(target,items,columns,action)=>{
 };
 const fmtDate=x=>x?new Date(x).toLocaleString():'—';
 const fmtSettings=x=>x?(x.model||'Global')+' · '+(x.timeout_ms==null?'Global':x.timeout_ms/1000+'s')+' · '+(x.tokens??'Global')+' tokens':'—';
+
+function renderQualityTrend(rows){
+ const target=$('qualityTrendChart'),legend=$('qualityTrendLegend');target.replaceChildren();legend.replaceChildren();
+ if(!rows.length){target.textContent='No scored evaluations yet. Rate and save model comparisons to populate this chart.';target.style.display='grid';target.style.placeItems='center';return}
+ target.style.display='block';
+ const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 900 280');svg.setAttribute('width','100%');svg.setAttribute('role','img');svg.setAttribute('aria-label','Model quality trend, rated from 1 to 5');
+ const add=(tag,attrs,content)=>{const el=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));if(content!==undefined)el.textContent=String(content);svg.append(el);return el};
+ const days=[...new Set(rows.map(x=>x.day))].sort(),models=[...new Set(rows.map(x=>x.model))],colors=['#006bb6','#9b59b6','#e67e22','#14866d','#c44569','#64748b','#a16207'];
+ const left=55,right=870,top=20,bottom=236;
+ const px=day=>left+(days.length===1?.5:days.indexOf(day)/(days.length-1))*(right-left),py=score=>bottom-(Number(score)-1)/4*(bottom-top);
+ for(let score=1;score<=5;score++){const y=py(score);add('line',{x1:left,y1:y,x2:right,y2:y,stroke:'#dce3eb','stroke-width':1});add('text',{x:34,y:y+4,fill:'#536579','font-size':13,'text-anchor':'end'},score)}
+ for(const day of days){add('text',{x:px(day),y:260,fill:'#536579','font-size':12,'text-anchor':'middle'},day.slice(5))}
+ models.forEach((model,i)=>{const color=colors[i%colors.length],points=rows.filter(x=>x.model===model).sort((a,b)=>a.day.localeCompare(b.day));if(points.length>1)add('polyline',{points:points.map(x=>px(x.day)+','+py(x.quality)).join(' '),fill:'none',stroke:color,'stroke-width':3,'stroke-linecap':'round','stroke-linejoin':'round'});
+ for(const point of points){const dot=add('circle',{cx:px(point.day),cy:py(point.quality),r:5,fill:color,stroke:'#fff','stroke-width':1.5,tabindex:0});const title=document.createElementNS(ns,'title');title.textContent=model+' · '+point.day+' · '+point.quality+'/5 · '+point.rated+' ratings';dot.append(title)}
+ const item=document.createElement('span');item.style.cssText='font-size:12px;display:inline-flex;align-items:center;gap:6px';const swatch=document.createElement('span');swatch.style.cssText='width:10px;height:10px;border-radius:50%;background:'+color;item.append(swatch,document.createTextNode(model));legend.append(item)});
+ target.append(svg);
+}
 async function loadModelInsights(){
  try{
   const feature=$('leaderFeature').value||null;
-  const [sessions,leader,reliability,recs,history]=await Promise.all([
+  const [sessions,leader,trend,reliability,recs,history]=await Promise.all([
    rpc('ai_evaluation_sessions',{p_limit:75}),
    rpc('ai_evaluation_leaderboard',{p_component:feature}),
+   rpc('ai_evaluation_quality_trend',{p_component:feature}),
    rpc('ai_model_reliability',{p_days:Number($('reliabilityDays').value)}),
    rpc('ai_model_recommendations',{p_min_ratings:3}),
    rpc('ai_model_config_list',{p_component:null})
@@ -276,6 +294,7 @@ async function loadModelInsights(){
    }catch(e){$('sessionStatus').textContent='Restore failed: '+e.message}
    finally{btn.disabled=false}
   }});
+  renderQualityTrend(trend);
   renderRows('leaderRows',leader,[x=>x.model,x=>x.feature,x=>x.rated,x=>x.quality??'Not rated',x=>money(x.average_cost),x=>x.average_ms==null?'—':x.average_ms+' ms']);
   renderRows('reliabilityRows',reliability,[x=>x.model,x=>x.component_key,x=>x.requests,x=>x.successful,x=>x.errors,x=>x.timeouts,x=>x.empty_responses,x=>x.mean_ms==null?'—':x.mean_ms+' ms']);
   const target=$('recommendations');target.replaceChildren();

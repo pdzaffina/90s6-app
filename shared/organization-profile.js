@@ -113,7 +113,13 @@
    let colors=fallback,reason='Dominant colors extracted directly from the uploaded logo.',source='image';
    try{
     const prompt='You are a professional UI brand designer. Recommend exactly three accessible hex colors for a web application based on these sampled colors from its organization logo: '+JSON.stringify(samples)+'. Current platform defaults: '+JSON.stringify(defaults)+'. Return ONLY JSON with keys primary_color, secondary_color, accent_color, explanation. Use #RRGGBB hex colors, choose a readable dark secondary color for navigation and a strong primary for interactive controls. Do not claim to have viewed the image; you received sampled pixels. Explain the tradeoff in one sentence.';
-    const {data,error}=await sb.functions.invoke('ai-platform-gateway',{body:{component:'platform_content',tenant_id:selectedTenant,content:prompt}});
+    const {data:visionSettings}=await sb.from('ai_vision_settings').select('enabled').eq('id',true).maybeSingle();
+    let data,error;
+    if(visionSettings?.enabled){
+      ({data,error}=await sb.functions.invoke('organization-logo-vision',{body:{tenant_id:selectedTenant,image:selectedLogo}}));
+    }else{
+      ({data,error}=await sb.functions.invoke('ai-platform-gateway',{body:{component:'platform_content',tenant_id:selectedTenant,content:prompt}}));
+    }
     if(error||data?.error)throw Error(data?.error||error.message);
     const response=String(data?.content||'').replace(/^\s*```(?:json)?/i,'').replace(/```\s*$/,'').trim();
     const parsed=JSON.parse(response);

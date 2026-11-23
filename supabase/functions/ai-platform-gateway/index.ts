@@ -76,6 +76,11 @@ Deno.serve(async(req)=>{
   billed=response.ok;
   if(!response.ok)return reply({error:"Provider HTTP "+response.status,usage_id:usageId},502);
   const content=data?.choices?.[0]?.message?.content;
+  if(component==="evaluation_judge"&&(!content||typeof content!=="string"||!content.trim())){
+   const reasonTokens=Number(data?.usage?.completion_tokens_details?.reasoning_tokens||0);
+   const used=Number(data?.usage?.completion_tokens||0);
+   return reply({error:reasonTokens>=used&&used>0?"Judge model consumed its output token budget in reasoning without returning an assessment. Select a different judge model.":"Judge model returned no visible assessment. Select a different judge model.",usage_id:usageId},422);
+  }
   return reply({usage_id:usageId,model,input_tokens:inputTokens||null,output_tokens:outputTokens||null,estimated_usd:cost,content:typeof content==="string"?content:JSON.stringify(content??"")});
  }catch(e){
   try{await sb.rpc("ainbox_ai_audit_response",{p_usage:usageId,p_payload:null,p_http:null,p_provider_id:null,p_error:e instanceof Error?e.message:"Request failed",p_input:null,p_output:null,p_cost:null})}catch{}

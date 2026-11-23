@@ -24,6 +24,23 @@
     location.reload();
   }
 
+  // Organization theme is scoped to the selected tenant and never cached across tenants.
+  let organizationProfile=null;
+  const applyOrganizationTheme=async()=>{
+    organizationProfile=null;
+    for(const [variable,value] of Object.entries({'--ap-blue':'#006BB6','--ap-midnight':'#0A192F','--ap-slate':'#708090'}))document.documentElement.style.setProperty(variable,value);
+    if(activeTenantId){
+      const {data,error}=await sb.from('organization_profiles').select('primary_color,secondary_color,accent_color,logo_data').eq('tenant_id',activeTenantId).maybeSingle();
+      if(!error&&data){organizationProfile=data;
+        if(data.primary_color)document.documentElement.style.setProperty('--ap-blue',data.primary_color);
+        if(data.secondary_color)document.documentElement.style.setProperty('--ap-midnight',data.secondary_color);
+        if(data.accent_color)document.documentElement.style.setProperty('--ap-slate',data.accent_color);
+      }
+    }
+    window.dispatchEvent(new CustomEvent('organization-theme-changed',{detail:organizationProfile}));
+  };
+  window.addEventListener('organization-profile-updated',()=>applyOrganizationTheme());
+
   // ---------- Sign in gate ----------
   const gate = el('div', { id: 'appGate' });
   gate.innerHTML = `
@@ -131,6 +148,7 @@
       organizationFeatures=tenantGrants.data?.organization||{};
       tenantUserFeatures=tenantGrants.data?.user||{};
     }
+    await applyOrganizationTheme();
     state = 'in';
     const path=location.pathname; const needed=path.startsWith('/content-studio/')?'content_studio':path.startsWith('/portfolio-management/')?'portfolio_management':path.startsWith('/work-board/')?'work_board':path.startsWith('/knowledge-base/')?'knowledge_base':path.startsWith('/action-inbox/')?'action_inbox':path.startsWith('/prompts/')?'prompt_library':path.startsWith('/training/')?'training':null; const extra=path.startsWith('/training/studio.')?'content_studio':path.startsWith('/training/curate.')?'use_case_curator':null; if((needed&&!hasFeature(needed))||(extra&&!hasFeature(extra))||(path.startsWith('/content-studio/')&&!(profile.is_admin||profile.is_superuser||profile.is_content_creator))){location.replace('/?access=denied');return;}
     sb.from('profiles').update({ last_seen_at: new Date().toISOString() }).eq('id', s.user.id).then(() => {});
@@ -184,6 +202,7 @@
     sb,
     hasFeature,
     get activeTenantId() { return activeTenantId; },
+    get organizationProfile() { return organizationProfile; },
     get tenantMemberships() { return [...tenantMemberships]; },
     tenantRole,
     isTenantAdmin,

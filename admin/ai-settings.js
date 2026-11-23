@@ -4,7 +4,7 @@ const form=$('globalAiForm'),status=$('globalAiStatus');
 if(!form)return;
 const say=(message,error=false)=>{status.textContent=message;status.className='ap-msg'+(error?' err':'');};
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data;};
-let allowed=false;
+let allowed=false;let discoveredModels=[];let defaultModel='';
 const enabledToggle=$('globalAiEnabled');
 enabledToggle.onchange=async()=>{const desired=enabledToggle.checked;enabledToggle.disabled=true;try{await rpc('ainbox_ai_set_enabled',{p_enabled:desired});$('globalAiSwitchStatus').textContent=desired?'AI enabled':'AI disabled';}catch(e){enabledToggle.checked=!desired;say('Could not change AI state: '+e.message,true)}finally{enabledToggle.disabled=false}};
 const updateReasoning=()=>{const model=$('globalAiTestType').value==='alternate'?$('globalAiAlternateModel').value:$('globalAiModel').value;const supports=model.startsWith('openai/gpt-oss-');$('globalAiReasoning').disabled=!supports;if(!supports)$('globalAiReasoning').value='auto';};
@@ -51,6 +51,7 @@ async function refreshModels(selected){
   picker.replaceChildren();
   const alternate=$('globalAiAlternateModel'),prior=alternate.value;
   alternate.replaceChildren();
+  discoveredModels=data.models.filter(m=>typeof m.id==='string'&&!/(?:^|[\\/_.-])(embed(?:ding|dings)?|rerank(?:er|ing)?|reward|speech|asr|tts)(?:$|[\\/_.-])/i.test(m.id));
   for(const model of data.models){const label=model.label===model.id?model.id:model.label+' ('+model.id+')';picker.add(new Option(label,model.id));alternate.add(new Option(label,model.id));}
   if(data.models.some(m=>m.id===prior))alternate.value=prior;
   else if(data.models.some(m=>m.id!==selected))alternate.value=data.models.find(m=>m.id!==selected).id;
@@ -59,6 +60,7 @@ async function refreshModels(selected){
   updateReasoning();
   say(data.models.length+' provider models loaded. Some may not support chat completions.');
  }catch(e){
+  discoveredModels=[{id:'openai/gpt-oss-20b',label:'GPT-OSS 20B'},{id:'openai/gpt-oss-120b',label:'GPT-OSS 120B'},{id:'meta/llama-3.1-8b-instruct',label:'Llama 3.1 8B Instruct'}];
   picker.replaceChildren(new Option('GPT-OSS 20B (fallback)','openai/gpt-oss-20b'),new Option('GPT-OSS 120B (fallback)','openai/gpt-oss-120b'));
   if(selected&&!Array.from(picker.options).some(x=>x.value===selected))picker.add(new Option('Currently configured: '+selected,selected));
   picker.value=selected||'openai/gpt-oss-20b';
@@ -77,7 +79,20 @@ async function loadComponents(){
   const info=document.createElement('span');
   const name=document.createElement('strong');name.textContent=component.label;
   const description=document.createElement('small');description.style.cssText='display:block;opacity:.7';description.textContent=component.description;
-  info.append(name,description);row.append(toggle,info);target.append(row);
+  const controls=document.createElement('div');controls.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto';
+  const modelLabel=document.createElement('label');modelLabel.style.cssText='font-size:12px;display:grid;gap:3px';modelLabel.textContent='AI model';
+  const modelSelect=document.createElement('select');modelSelect.className='ap-input';modelSelect.style.cssText='min-width:210px;max-width:340px;font-size:12px';
+  modelSelect.add(new Option('Use global default',''));
+  const configured=component.model_override||'';
+  for(const m of discoveredModels){if(!modelSelect.querySelector('option[value="'+m.id+'"]'))modelSelect.add(new Option(m.label&&m.label!==m.id?m.label+' ('+m.id+')':m.id,m.id))}
+  if(configured&&![...modelSelect.options].some(o=>o.value===configured))modelSelect.add(new Option('Configured: '+configured,configured));
+  modelSelect.value=configured;
+  const save=document.createElement('button');save.type='button';save.className='ap-btn sm';save.textContent='Save model';
+  const effective=document.createElement('small');effective.style.cssText='display:block;opacity:.7';effective.textContent=configured?'Override: '+configured:'Inherits global model';
+  modelLabel.append(modelSelect,effective);controls.append(modelLabel,save);
+  info.append(name,description);row.append(toggle,info,controls);row.style.flexWrap='wrap';target.append(row);
+  save.onclick=async()=>{save.disabled=true;try{await rpc('ainbox_ai_set_component_model',{p_key:component.key,p_model:modelSelect.value||null});effective.textContent=modelSelect.value?'Override: '+modelSelect.value:'Inherits global model';$('globalAiComponentsStatus').textContent=component.label+' model saved.';}catch(e){$('globalAiComponentsStatus').textContent='Could not save model: '+e.message;}finally{save.disabled=false}};
+
   toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled');}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message;}finally{toggle.disabled=false;}};
  }
 }
@@ -85,8 +100,9 @@ async function load(){
  try{
   const settings=await rpc('ainbox_ai_get_settings');
   const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
-  await loadComponents();
+  defaultModel=settings.model;
   await refreshModels(settings.model);
+  await loadComponents();
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);
   say('Settings loaded. Changes apply to the next AI assessment.');
@@ -98,7 +114,7 @@ form.addEventListener('submit',async event=>{
  const model=$('globalAiModel').value,seconds=Number($('globalAiTimeout').value),tokens=Number($('globalAiTokens').value);
  if(!Number.isInteger(seconds)||seconds<5||seconds>60||!Number.isInteger(tokens)||tokens<100||tokens>4096){say('Timeout must be 5 to 60 seconds and tokens 100 to 4096.',true);return}
  const button=$('globalAiSave');button.disabled=true;say('Saving settings…');
- try{await rpc('ainbox_ai_save_settings',{p_model:model,p_timeout_ms:seconds*1000,p_max_tokens:tokens});say('AI settings saved. The next assessment will use the selected configuration.');}
+ try{await rpc('ainbox_ai_save_settings',{p_model:model,p_timeout_ms:seconds*1000,p_max_tokens:tokens});say('Global default saved. Components with a model override will keep their independently selected model.');}
  catch(e){say('Could not save AI settings: '+e.message,true)}
  finally{button.disabled=false;}
 });

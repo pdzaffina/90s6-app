@@ -110,9 +110,9 @@ create index crm_health_org on public.crm_health(org_id,account_id);
 create function public.crm_allowed(p_org uuid,p_write boolean default false,p_feature text default null)
 returns boolean language sql stable security definer set search_path='' as $$
  select auth.uid() is not null
- and exists(select 1 from public.tenant_members m join public.profiles p on p.id=m.user_id
-   where m.tenant_id=p_org and m.user_id=auth.uid() and m.status='active' and not p.disabled
-   and (not p_write or m.role in ('tenant_admin','superuser') or p.is_admin))
+ and exists(select 1 from public.profiles p where p.id=auth.uid() and not p.disabled and
+  (p.is_admin or exists(select 1 from public.tenant_members m where m.tenant_id=p_org and m.user_id=p.id and m.status='active'
+   and (not p_write or m.role in ('tenant_admin','superuser')))))
  and exists(select 1 from public.tenant_feature_access t where t.tenant_id=p_org and t.feature='crm' and t.enabled)
  and not exists(select 1 from public.tenant_user_feature_access u where u.tenant_id=p_org and u.user_id=auth.uid() and u.feature='crm' and not u.enabled)
  and not exists(select 1 from public.user_feature_access u where u.user_id=auth.uid() and u.feature='crm' and not u.enabled)
@@ -141,5 +141,11 @@ begin
 end $$;
 -- CRM settings are managed by organization admins, and cannot be deleted.
 drop policy crm_delete on public.crm_settings;
+-- Confidential feedback is only visible to its author and organization administrators.
+drop policy crm_read on public.crm_feedback;
+create policy crm_read on public.crm_feedback for select to authenticated using (
+ public.crm_allowed(org_id,false,'feedback') and
+ (visibility='team' or created_by=auth.uid() or public.crm_allowed(org_id,true,'feedback'))
+);
 -- Set creator/owner fields in application requests; RLS remains authoritative.
 commit;

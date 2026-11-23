@@ -1,0 +1,1 @@
+update public.ainbox_ai_components set model_override='nvidia/nemotron-3.5-super-vl-120b-a12b',updated_at=now() where component_key='evaluation_judge' and model_override='nvidia/nemotron-3.5-lightning-30b-a3b';

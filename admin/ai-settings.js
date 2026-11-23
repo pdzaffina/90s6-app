@@ -99,7 +99,7 @@ async function loadComponents(){
   const tokens=document.createElement('input');tokens.type='number';tokens.className='ap-input';tokens.min='100';tokens.max='4096';tokens.step='1';tokens.style.width='120px';tokens.value=String(component.tokens_override||$('globalAiTokens').value);
   makeField('Maximum output tokens',tokens);
   const save=document.createElement('button');save.type='button';save.className='ap-btn sm';save.textContent='Save settings';
-  fields.append(save);
+  header.append(save);
   const status=document.createElement('small');status.style.cssText='display:block;margin-top:8px;opacity:.75';
   const sync=()=>{const enabled=mode.value==='custom';fields.hidden=!enabled;status.textContent=enabled?'Custom settings for this feature':'Inherits global model, timeout and token limit';};
   mode.onchange=sync;sync();
@@ -110,7 +110,7 @@ async function loadComponents(){
    await rpc('ainbox_ai_save_component_settings',{p_key:component.key,p_custom:isCustom,p_model:isCustom?model.value:null,p_timeout_ms:isCustom?seconds*1000:null,p_max_tokens:isCustom?maxTokens:null});
    status.textContent=isCustom?'Custom settings saved':'Global settings inheritance saved';
   }catch(e){status.textContent='Unable to save: '+e.message}finally{save.disabled=false}};
-  mode.onchange=()=>{sync();save.textContent='Save settings';if(mode.value==='global'){fields.hidden=false;model.disabled=true;timeout.disabled=true;tokens.disabled=true;}else{model.disabled=false;timeout.disabled=false;tokens.disabled=false;}};
+  mode.onchange=()=>{sync();save.textContent='Save settings';};
   mode.onchange();
   toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled')}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message}finally{toggle.disabled=false}};
  }

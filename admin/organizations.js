@@ -1,8 +1,10 @@
 (() => {
 'use strict';
 const $=id=>document.getElementById(id),sb=App.sb;
-const features=[['portfolio_management','Portfolio Management'],['work_board','Work Boards'],['training','Training'],['prompt_library','Prompt Library'],['content_studio','Content Studio'],['studio_courses','Course editing'],['studio_prompts','Prompt editing'],['studio_knowledge','Knowledge editing'],['knowledge_base','Knowledge Base'],['use_case_curator','Create Custom Plan']];
+let features=[];
+async function loadRegistry(){const {data,error}=await sb.from('application_registry').select('feature_key,display_name').eq('active',true).order('sort_order');if(error)throw error;features=(data||[]).map(x=>[x.feature_key,x.display_name]);}
 async function load(){
+ await loadRegistry();
  const tenant=$('globalOrgFeatureTenant').value;
  const area=$('globalOrgFeatureOptions');area.replaceChildren();
  if(!tenant)return;

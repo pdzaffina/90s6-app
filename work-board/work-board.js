@@ -65,7 +65,7 @@
     <div class="wcCard">
       <h2>Work Board</h2>
       <p id="wcLead"></p>
-      <div id="wcNone" class="wcRow" hidden><button class="primary" type="button" id="wcCreateFirst">Create a board</button><button type="button" id="wcOutNone">Sign out</button></div>
+      <div id="wcNone" class="wcRow" hidden><button class="primary" type="button" id="wcCreateFirst">Create a board</button><button type="button" id="wcOutNone">Back to home</button></div>
       <p id="wcMsg" role="status"></p>
     </div>`;
   document.body.append(gate);
@@ -193,7 +193,7 @@
   sel.addEventListener('change', async () => { if (!(await openBoard(sel.value))) renderBar(); });
 
   App.onBeforeSignOut(flush);
-  $('wcOutNone').addEventListener('click', () => App.signOut());
+  $('wcOutNone').addEventListener('click', () => { window.location.assign('/'); });
 
   // ---------- Share / manage dialog ----------
   const dlg = el('dialog', { id: 'wcManage' });

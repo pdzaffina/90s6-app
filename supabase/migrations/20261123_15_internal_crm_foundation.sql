@@ -8,7 +8,9 @@ alter table public.user_feature_access drop constraint if exists user_feature_ac
 alter table public.user_feature_access add constraint user_feature_access_feature_check
 check (feature in ('action_inbox','portfolio_management','work_board','crm','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator'));
 alter table public.tenant_feature_access drop constraint if exists tenant_feature_access_feature_check;
+alter table public.tenant_feature_access add constraint tenant_feature_access_feature_check check (feature in ('action_inbox','portfolio_management','work_board','crm','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator'));
 alter table public.tenant_user_feature_access drop constraint if exists tenant_user_feature_access_feature_check;
+alter table public.tenant_user_feature_access add constraint tenant_user_feature_access_feature_check check (feature in ('action_inbox','portfolio_management','work_board','crm','training','prompt_library','content_studio','studio_courses','studio_prompts','studio_knowledge','knowledge_base','use_case_curator'));
 -- CRM is opt-in for every organization.
 insert into public.tenant_feature_access(tenant_id,feature,enabled)
 select id,'crm',false from public.tenants on conflict do nothing;
@@ -46,7 +48,7 @@ create table public.crm_contacts(
 create table public.crm_account_contacts(
  org_id uuid not null references public.tenants(id),account_id uuid not null,contact_id uuid not null,
  role text not null default 'stakeholder',is_primary boolean not null default false,
- primary key(account_id,contact_id),
+ created_at timestamptz not null default now(),primary key(account_id,contact_id),
  foreign key(org_id,account_id) references public.crm_accounts(org_id,id) on delete cascade,
  foreign key(org_id,contact_id) references public.crm_contacts(org_id,id) on delete cascade
 );
@@ -76,7 +78,7 @@ create table public.crm_activities(
  kind text not null default 'note' check(kind in ('note','meeting','call','email','other')),
  subject text not null check(length(trim(subject))>0),details text not null default '',
  occurred_at timestamptz not null default now(),created_by uuid references public.profiles(id),
- created_at timestamptz not null default now(),
+ created_at timestamptz not null default now(),updated_at timestamptz not null default now(),
  foreign key(org_id,account_id) references public.crm_accounts(org_id,id),
  foreign key(org_id,contact_id) references public.crm_contacts(org_id,id),
  foreign key(org_id,engagement_id) references public.crm_engagements(org_id,id)
@@ -85,7 +87,7 @@ create table public.crm_feedback(
  id uuid primary key default gen_random_uuid(),org_id uuid not null references public.tenants(id),
  account_id uuid not null,engagement_id uuid,rating integer check(rating between 1 and 5),
  comments text not null default '',visibility text not null default 'team' check(visibility in ('team','restricted')),
- created_by uuid references public.profiles(id),created_at timestamptz not null default now(),
+ created_by uuid references public.profiles(id),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),
  foreign key(org_id,account_id) references public.crm_accounts(org_id,id),
  foreign key(org_id,engagement_id) references public.crm_engagements(org_id,id)
 );
@@ -93,7 +95,7 @@ create table public.crm_health(
  id uuid primary key default gen_random_uuid(),org_id uuid not null references public.tenants(id),
  account_id uuid not null,dimension text not null check(dimension in ('engagement','responsiveness','commitments','satisfaction','alignment')),
  score integer check(score between 0 and 100),notes text not null default '',
- assessed_by uuid references public.profiles(id),assessed_at timestamptz not null default now(),
+ assessed_by uuid references public.profiles(id),assessed_at timestamptz not null default now(),created_at timestamptz not null default now(),updated_at timestamptz not null default now(),
  foreign key(org_id,account_id) references public.crm_accounts(org_id,id)
 );
 create index crm_accounts_org on public.crm_accounts(org_id,name);

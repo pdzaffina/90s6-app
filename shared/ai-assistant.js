@@ -5,7 +5,7 @@ const app=document.currentScript?.dataset.aiApp;
 if(!config[app])return;
 function el(tag,attrs={},text){const n=document.createElement(tag);Object.assign(n,attrs);if(text!==undefined)n.textContent=text;return n}
 const launch=el('button',{type:'button',id:'sharedAiLaunch'},'AI assistant');
-launch.style.cssText='position:fixed;right:20px;bottom:20px;z-index:900;border:0;border-radius:30px;background:#006bb6;color:white;padding:11px 18px;font:600 14px system-ui;box-shadow:0 4px 15px #0002;cursor:pointer';
+launch.style.cssText='border:0;border-radius:8px;background:#006bb6;color:white;padding:10px 16px;font:600 14px system-ui;box-shadow:0 2px 8px #0002;cursor:pointer';
 const panel=el('section',{id:'sharedAiPanel'});panel.hidden=true;panel.style.cssText='position:fixed;right:20px;bottom:76px;z-index:901;width:min(440px,calc(100vw - 40px));max-height:75vh;overflow:auto;background:var(--ap-paper,#fff);color:var(--ap-ink,#101e32);border:1px solid #dce3eb;border-radius:14px;padding:18px;box-shadow:0 12px 45px #0003;font:14px system-ui';
 const head=el('div');head.style.cssText='display:flex;justify-content:space-between;align-items:center;gap:10px';
 const close=el('button',{type:'button'},'Close');close.onclick=()=>panel.hidden=true;
@@ -27,5 +27,7 @@ run.onclick=async()=>{
 };
 panel.append(head,desc,field,run,status,output);
 launch.onclick=()=>{panel.hidden=!panel.hidden;if(!panel.hidden)field.focus()};
-document.body.append(panel,launch);
+const toolbar=document.querySelector('header .toolbar');
+if(toolbar){toolbar.prepend(launch)}else{launch.style.cssText+=';position:fixed;right:20px;bottom:20px;z-index:900';document.body.append(launch)}
+document.body.append(panel);
 })();

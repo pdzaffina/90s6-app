@@ -74,26 +74,45 @@ async function loadComponents(){
  const list=await rpc('ainbox_ai_list_components');
  const target=$('globalAiComponents');target.replaceChildren();
  for(const component of list){
-  const row=document.createElement('label');row.style.cssText='display:flex;align-items:center;gap:12px';
-  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=component.enabled;
-  const info=document.createElement('span');
+  const card=document.createElement('div');card.style.cssText='border:1px solid #dce3eb;border-radius:10px;padding:12px 14px;background:#fff';
+  const header=document.createElement('div');header.style.cssText='display:flex;align-items:center;gap:12px;flex-wrap:wrap';
+  const toggle=document.createElement('input');toggle.type='checkbox';toggle.checked=component.enabled;toggle.setAttribute('aria-label','Enable '+component.label);
+  const info=document.createElement('div');info.style.cssText='flex:1;min-width:190px';
   const name=document.createElement('strong');name.textContent=component.label;
   const description=document.createElement('small');description.style.cssText='display:block;opacity:.7';description.textContent=component.description;
-  const controls=document.createElement('div');controls.style.cssText='display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto';
-  const modelLabel=document.createElement('label');modelLabel.style.cssText='font-size:12px;display:grid;gap:3px';modelLabel.textContent='AI model';
-  const modelSelect=document.createElement('select');modelSelect.className='ap-input';modelSelect.style.cssText='min-width:210px;max-width:340px;font-size:12px';
-  modelSelect.add(new Option('Use global default',''));
-  const configured=component.model_override||'';
-  for(const m of discoveredModels){if(!modelSelect.querySelector('option[value="'+m.id+'"]'))modelSelect.add(new Option(m.label&&m.label!==m.id?m.label+' ('+m.id+')':m.id,m.id))}
-  if(configured&&![...modelSelect.options].some(o=>o.value===configured))modelSelect.add(new Option('Configured: '+configured,configured));
-  modelSelect.value=configured;
-  const save=document.createElement('button');save.type='button';save.className='ap-btn sm';save.textContent='Save model';
-  const effective=document.createElement('small');effective.style.cssText='display:block;opacity:.7';effective.textContent=configured?'Override: '+configured:'Inherits global model';
-  modelLabel.append(modelSelect,effective);controls.append(modelLabel,save);
-  info.append(name,description);row.append(toggle,info,controls);row.style.flexWrap='wrap';target.append(row);
-  save.onclick=async()=>{save.disabled=true;try{await rpc('ainbox_ai_set_component_model',{p_key:component.key,p_model:modelSelect.value||null});effective.textContent=modelSelect.value?'Override: '+modelSelect.value:'Inherits global model';$('globalAiComponentsStatus').textContent=component.label+' model saved.';}catch(e){$('globalAiComponentsStatus').textContent='Could not save model: '+e.message;}finally{save.disabled=false}};
-
-  toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled');}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message;}finally{toggle.disabled=false;}};
+  info.append(name,description);
+  const modeLabel=document.createElement('label');modeLabel.style.cssText='display:grid;gap:3px;font-size:12px';modeLabel.textContent='Configuration';
+  const mode=document.createElement('select');mode.className='ap-input';mode.add(new Option('Use global settings','global'));mode.add(new Option('Custom settings','custom'));
+  const custom=Boolean(component.model_override||component.timeout_override_ms||component.tokens_override);
+  mode.value=custom?'custom':'global';modeLabel.append(mode);
+  header.append(toggle,info,modeLabel);
+  const fields=document.createElement('div');fields.style.cssText='display:flex;align-items:end;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid #e6ecf2';
+  const makeField=(title,input)=>{const label=document.createElement('label');label.style.cssText='display:grid;gap:5px;font-size:12px';label.textContent=title;label.append(input);fields.append(label);return input};
+  const model=document.createElement('select');model.className='ap-input';model.style.cssText='min-width:240px;max-width:360px';
+  const current=component.model_override||defaultModel;
+  for(const m of discoveredModels){if(![...model.options].some(o=>o.value===m.id))model.add(new Option(m.label&&m.label!==m.id?m.label+' ('+m.id+')':m.id,m.id))}
+  if(current&&![...model.options].some(o=>o.value===current))model.add(new Option('Configured: '+current,current));
+  model.value=current;
+  makeField('Model',model);
+  const timeout=document.createElement('input');timeout.type='number';timeout.className='ap-input';timeout.min='5';timeout.max='60';timeout.step='1';timeout.style.width='105px';timeout.value=String((component.timeout_override_ms||Number($('globalAiTimeout').value)*1000)/1000);
+  makeField('Timeout (seconds)',timeout);
+  const tokens=document.createElement('input');tokens.type='number';tokens.className='ap-input';tokens.min='100';tokens.max='4096';tokens.step='1';tokens.style.width='120px';tokens.value=String(component.tokens_override||$('globalAiTokens').value);
+  makeField('Maximum output tokens',tokens);
+  const save=document.createElement('button');save.type='button';save.className='ap-btn sm';save.textContent='Save settings';
+  fields.append(save);
+  const status=document.createElement('small');status.style.cssText='display:block;margin-top:8px;opacity:.75';
+  const sync=()=>{const enabled=mode.value==='custom';fields.hidden=!enabled;status.textContent=enabled?'Custom settings for this feature':'Inherits global model, timeout and token limit';};
+  mode.onchange=sync;sync();
+  card.append(header,fields,status);target.append(card);
+  save.onclick=async()=>{save.disabled=true;try{
+   const isCustom=mode.value==='custom',seconds=Number(timeout.value),maxTokens=Number(tokens.value);
+   if(isCustom&&(!model.value||!Number.isInteger(seconds)||seconds<5||seconds>60||!Number.isInteger(maxTokens)||maxTokens<100||maxTokens>4096))throw Error('Choose a model, timeout 5–60 seconds and tokens 100–4096');
+   await rpc('ainbox_ai_save_component_settings',{p_key:component.key,p_custom:isCustom,p_model:isCustom?model.value:null,p_timeout_ms:isCustom?seconds*1000:null,p_max_tokens:isCustom?maxTokens:null});
+   status.textContent=isCustom?'Custom settings saved':'Global settings inheritance saved';
+  }catch(e){status.textContent='Unable to save: '+e.message}finally{save.disabled=false}};
+  mode.onchange=()=>{sync();save.textContent='Save settings';if(mode.value==='global'){fields.hidden=false;model.disabled=true;timeout.disabled=true;tokens.disabled=true;}else{model.disabled=false;timeout.disabled=false;tokens.disabled=false;}};
+  mode.onchange();
+  toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled')}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message}finally{toggle.disabled=false}};
  }
 }
 async function load(){
@@ -102,9 +121,9 @@ async function load(){
   const {data:enabled,error:enabledError}=await App.sb.rpc('ainbox_ai_is_enabled');if(enabledError)throw enabledError;enabledToggle.checked=enabled===true;$('globalAiSwitchStatus').textContent=enabled?'AI enabled':'AI disabled';
   defaultModel=settings.model;
   await refreshModels(settings.model);
-  await loadComponents();
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);
+  await loadComponents();
   say('Settings loaded. Changes apply to the next AI assessment.');
  }catch(e){say('Unable to load AI settings: '+e.message,true);}
 }

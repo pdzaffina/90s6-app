@@ -25,7 +25,7 @@ Deno.serve(async(req)=>{
  if(accessError||allowed!==true)return reply({error:"Access denied or AI component disabled"},403);
  const {data:settings,error:settingsError}=await sb.rpc("ai_platform_runtime_settings",{p_tenant:tenant,p_component:component});
  if(settingsError)return reply({error:"Model settings unavailable"},503);
- const model=String(body.model||settings?.model||"openai/gpt-oss-20b");
+ const model=String(component==="evaluation_judge"?(settings?.model||"meta/llama-3.1-8b-instruct"):(body.model||settings?.model||"openai/gpt-oss-20b"));
  if(model.length>160||! /^[a-zA-Z0-9_.:/-]+$/.test(model))return reply({error:"Invalid model"},400);
  let payload:any;
  if(component==="evaluation_judge"){

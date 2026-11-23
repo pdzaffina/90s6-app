@@ -195,7 +195,7 @@ $('judgeRun').onclick=async()=>{
  const button=$('judgeRun');button.disabled=true;$('judgeStatus').textContent='AI judge is reviewing the original request and both responses...';
  try{
   const pair=await rpc('ai_evaluation_pair',{p_a:a,p_b:b});
-  const result=await invokeGateway({tenant_id:pair.tenant_id,component:'evaluation_judge',model:'meta/llama-3.1-8b-instruct',usage_a:a,usage_b:b});
+  const result=await invokeGateway({tenant_id:pair.tenant_id,component:'evaluation_judge',usage_a:a,usage_b:b});
   const proposal=parseJudgeSuggestion(result.content);
   judgeProposalId=await rpc('ai_evaluation_propose',{p_a:a,p_b:b,p_judge:result.usage_id,p_proposal:proposal});
   showJudgeSuggestion(proposal,false);

@@ -11,7 +11,7 @@
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
- '<div class="ap-org-brand-fields"><label>Organization logo (SVG or PNG, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
+ '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
  '<div class="ap-row"><button id="orgBrandSuggest" type="button" class="ap-btn" style="background:#e8f3fc;color:#006bb6;border-color:#b7d9ef">✦ Suggest palette with AI</button></div><p id="orgBrandAiStatus" class="ap-msg" role="status"></p><div id="orgBrandAiResult" class="ap-org-ai-result" hidden></div>'+ 
  '<div class="ap-row"><button id="orgBrandSave" class="ap-btn primary" type="button">Save organization profile</button><button id="orgBrandReset" class="ap-btn" type="button">Reset colors to 90s6</button></div><p id="orgBrandStatus" class="ap-msg" role="status"></p>';
  if(isGlobal)host.insertAdjacentElement('afterend',panel);else host.prepend(panel);
@@ -49,10 +49,11 @@
    if(svg){
     const source=new TextDecoder().decode(raw);
     if(!/^\s*(?:<\?xml[^>]*>\s*)?<svg[\s>]/i.test(source)||/<script|<foreignObject|\bon\w+\s*=|(?:href|url)\s*=\s*["']?\s*(?:https?:|javascript:|data:)|<!ENTITY|<!DOCTYPE/i.test(source))throw Error('SVG contains unsupported or unsafe content.');
-   }else{const b=new Uint8Array(raw);if(b.slice(0,8).join(',')!=='137,80,78,71,13,10,26,10')throw Error('Invalid PNG signature.');}
-   const objectUrl=URL.createObjectURL(new Blob([raw],{type:svg?'image/svg+xml':'image/png'}));
+   }
+   const objectUrl=URL.createObjectURL(new Blob([raw],{type:svg?'image/svg+xml':file.type}));
    try{
     const img=new Image();await new Promise((resolve,reject)=>{img.onload=resolve;img.onerror=()=>reject(Error('Could not decode logo.'));img.src=objectUrl;});
+    if(!img.naturalWidth||!img.naturalHeight)throw Error('Image has invalid dimensions.');
     const scale=Math.min(1,512/Math.max(img.naturalWidth,img.naturalHeight));
     const canvas=document.createElement('canvas');canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
     canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);

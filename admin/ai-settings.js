@@ -96,7 +96,7 @@ async function loadComponents(){
   makeField('Model',model);
   const timeout=document.createElement('input');timeout.type='number';timeout.className='ap-input';timeout.min='5';timeout.max='120';timeout.step='1';timeout.style.width='105px';timeout.value=String((component.timeout_override_ms||Number($('globalAiTimeout').value)*1000)/1000);
   makeField('Timeout (seconds)',timeout);
-  const tokens=document.createElement('input');tokens.type='number';tokens.className='ap-input';tokens.min='100';tokens.max='32768';tokens.step='1';tokens.style.width='120px';tokens.value=String(component.tokens_override||$('globalAiTokens').value);
+  const tokens=document.createElement('input');tokens.type='number';tokens.className='ap-input';tokens.min='100';tokens.max='262144';tokens.step='1';tokens.style.width='120px';tokens.value=String(component.tokens_override||$('globalAiTokens').value);
   makeField('Maximum output tokens',tokens);
   const save=document.createElement('button');save.type='button';save.className='ap-btn sm';save.textContent='Save settings';
   header.append(save);
@@ -106,7 +106,7 @@ async function loadComponents(){
   card.append(header,fields,status);target.append(card);
   save.onclick=async()=>{save.disabled=true;try{
    const isCustom=mode.value==='custom',seconds=Number(timeout.value),maxTokens=Number(tokens.value);
-   if(isCustom&&(!model.value||!Number.isInteger(seconds)||seconds<5||seconds>120||!Number.isInteger(maxTokens)||maxTokens<100||maxTokens>32768))throw Error('Choose a model, timeout 5–120 seconds and tokens 100–32768');
+   if(isCustom&&(!model.value||!Number.isInteger(seconds)||seconds<5||seconds>120||!Number.isInteger(maxTokens)||maxTokens<100||maxTokens>262144))throw Error('Choose a model, timeout 5–120 seconds and tokens 100–262144');
    await rpc('ainbox_ai_save_component_settings',{p_key:component.key,p_custom:isCustom,p_model:isCustom?model.value:null,p_timeout_ms:isCustom?seconds*1000:null,p_max_tokens:isCustom?maxTokens:null});
    status.textContent=isCustom?'Custom settings saved':'Global settings inheritance saved';
   }catch(e){status.textContent='Unable to save: '+e.message}finally{save.disabled=false}};
@@ -131,7 +131,7 @@ form.addEventListener('submit',async event=>{
  event.preventDefault();
  if(!allowed)return;
  const model=$('globalAiModel').value,seconds=Number($('globalAiTimeout').value),tokens=Number($('globalAiTokens').value);
- if(!Number.isInteger(seconds)||seconds<5||seconds>120||!Number.isInteger(tokens)||tokens<100||tokens>4096){say('Timeout must be 5 to 60 seconds and tokens 100 to 4096.',true);return}
+ if(!Number.isInteger(seconds)||seconds<5||seconds>120||!Number.isInteger(tokens)||tokens<100||tokens>262144){say('Timeout must be 5 to 60 seconds and tokens 100 to 262144.',true);return}
  const button=$('globalAiSave');button.disabled=true;say('Saving settings…');
  try{await rpc('ainbox_ai_save_settings',{p_model:model,p_timeout_ms:seconds*1000,p_max_tokens:tokens});say('Global default saved. Components with a model override will keep their independently selected model.');}
  catch(e){say('Could not save AI settings: '+e.message,true)}

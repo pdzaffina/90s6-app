@@ -20,9 +20,26 @@ function init(){
  const nav=document.createElement('nav');nav.className='admin-nav';nav.setAttribute('aria-label','Admin sections');
  const content=document.createElement('div');content.className='admin-content';
  aside.append(label,nav);workspace.append(aside,content);root.append(workspace);
- const titles=isTenant?['Members','Application access','Add or update member']:['AI configuration','Create organization','Organization app access','Invite user','Bulk manage users','Users','Assign users to organization','User app access','Audit log'];
+ const titles=isTenant?['Members','Application access','Add or update member']:null;
+ const globalLabels={
+  'AI Configuration':'AI configuration',
+  'Create organization':'Create organization',
+  'Organization profile':'Organization profile',
+  'Organization application access':'Organization app access',
+  'Invite a user':'Invite user',
+  'Bulk manage users':'Bulk manage users',
+  'Users':'Users',
+  'Assign selected users to an organization':'Assign users to organization',
+  'Application access':'User app access',
+  'Audit log':'Audit log'
+ };
+ const seen=new Set();
  const buttons=[];
- panels.forEach((p,i)=>{content.append(p);const b=document.createElement('button');b.type='button';b.textContent=titles[i]||p.querySelector('h2')?.textContent||'Settings';b.addEventListener('click',()=>select(i));nav.append(b);buttons.push(b)});
+ panels.forEach((p,i)=>{content.append(p);const b=document.createElement('button');b.type='button';const heading=p.querySelector(':scope > h2')?.textContent.trim()||'Settings';
+ const name=isTenant?(titles[i]||heading):(globalLabels[heading]||heading);
+ b.textContent=name;
+ if(seen.has(name))console.warn('Duplicate admin navigation heading:',name);
+ seen.add(name);b.addEventListener('click',()=>select(i));nav.append(b);buttons.push(b)});
  function select(index){panels.forEach((p,i)=>{p.hidden=i!==index});buttons.forEach((b,i)=>{if(i===index)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current')});}
  select(0);
  if(!isTenant){const scope=document.getElementById('adminScope');scope?.addEventListener('change',()=>select(0));}

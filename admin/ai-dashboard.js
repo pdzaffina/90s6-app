@@ -156,7 +156,7 @@ async function loadEffectiveness(){
    const title=document.createElement('span');title.textContent=g.ai_assisted?'AI-assisted exceptions':'Other exceptions';
    const big=document.createElement('strong');big.textContent=String(g.resolution_pct??0)+'% resolved';
    const sub=document.createElement('small');
-   sub.textContent=g.resolved+' of '+g.total+' resolved · Median resolution: '+(g.median_resolution_hours??'N/A')+' h · Mean: '+(g.mean_resolution_hours??'N/A')+' h · Approved remediation plans: '+g.approved_plans;
+   sub.textContent=g.resolved+' of '+g.total+' resolved · Median resolution: '+(g.median_resolution_hours??'N/A')+' h · Mean: '+(g.mean_resolution_hours??'N/A')+' h · Escalated: '+(g.escalated??0)+' ('+(g.escalation_pct??0)+'%) · Approved remediation plans: '+g.approved_plans;
    card.append(title,big,sub);target.append(card);
   }
   if(!groups.length)target.textContent='No exceptions detected in the selected window.';

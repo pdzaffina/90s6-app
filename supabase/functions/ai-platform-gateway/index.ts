@@ -63,7 +63,7 @@ Deno.serve(async(req)=>{
  const audit=await sb.rpc("ainbox_ai_audit_request",{p_usage:usageId,p_payload:payload});
  if(audit.error){await sb.rpc("ainbox_ai_finish",{p_id:usageId,p_input:0,p_output:0,p_cost:0,p_success:false});return reply({error:"Audit unavailable; request blocked"},503)}
  await sb.rpc("ai_audit_link_context",{p_usage:usageId,p_exception:null,p_replay:source&&UUID.test(source)?source:null});
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(60000,Math.max(5000,Number(settings?.timeout_ms)||20000)));
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),Math.min(120000,Math.max(5000,Number(settings?.timeout_ms)||20000)));
  try{
   const apiKey=Deno.env.get("AINBOX_LLM_API_KEY"),base=(Deno.env.get("AINBOX_LLM_BASE_URL")||"https://integrate.api.nvidia.com/v1").replace(/\/+$/,"");
   if(!apiKey||!base.startsWith("https://"))throw Error("Provider unavailable");

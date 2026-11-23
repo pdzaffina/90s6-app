@@ -131,3 +131,9 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 #appGate[hidden]{display:none!important}
 @keyframes ap-nav-progress{0%{background-position:-85% 0}100%{background-position:185% 0}}
 @media(prefers-reduced-motion:reduce){#appGate.ap-pending::before{animation:none;background:var(--ap-blue)}}
+
+/* AI action affordances: light blue. Generated content badges remain purple. */
+.ap-ai-action{background:#eaf2f8!important;color:#175b89!important;border:1px solid #a9cfe8!important;border-radius:9px;font-weight:750;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+.ap-ai-action:hover:not(:disabled){background:#d7ebfa!important;border-color:#78b6de!important;box-shadow:0 2px 9px #006bb61a}
+.ap-ai-action:focus-visible{outline:3px solid #006bb655;outline-offset:2px}
+.ap-ai-action:disabled{opacity:.6;cursor:wait}

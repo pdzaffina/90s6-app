@@ -115,6 +115,26 @@ async function loadComponents(){
   toggle.onchange=async()=>{const desired=toggle.checked;toggle.disabled=true;try{await rpc('ainbox_ai_set_component',{p_key:component.key,p_enabled:desired});$('globalAiComponentsStatus').textContent=component.label+(desired?' enabled':' disabled')}catch(e){toggle.checked=!desired;$('globalAiComponentsStatus').textContent='Unable to save: '+e.message}finally{toggle.disabled=false}};
  }
 }
+async function loadVision(){
+ const {data,error}=await App.sb.from('ai_vision_settings').select('enabled,model').eq('id',true).single();
+ if(error){$('globalVisionStatus').textContent='Unable to load vision settings: '+error.message;return;}
+ $('globalVisionEnabled').checked=!!data.enabled;
+ const select=$('globalVisionModel');
+ if(data.model&&![...select.options].some(o=>o.value===data.model))select.add(new Option('Configured: '+data.model,data.model));
+ select.value=data.model;
+ $('globalVisionStatus').textContent=data.enabled?'Vision suggestions enabled.':'Vision suggestions disabled. Logo color extraction remains available.';
+}
+$('globalVisionSave').onclick=async()=>{
+ if(!allowed)return;
+ const button=$('globalVisionSave');button.disabled=true;
+ try{
+  const model=$('globalVisionModel').value,enabled=$('globalVisionEnabled').checked;
+  const {data,error}=await App.sb.from('ai_vision_settings').update({enabled,model,updated_at:new Date().toISOString()}).eq('id',true).select('enabled,model').single();
+  if(error)throw error;
+  $('globalVisionStatus').textContent=data.enabled?'Vision model saved and enabled.':'Vision model saved, vision suggestions disabled.';
+ }catch(e){$('globalVisionStatus').textContent='Unable to save vision settings: '+e.message}
+ finally{button.disabled=false;}
+};
 async function load(){
  try{
   const settings=await rpc('ainbox_ai_get_settings');
@@ -124,6 +144,7 @@ async function load(){
   $('globalAiTimeout').value=String(settings.timeout_ms/1000);
   $('globalAiTokens').value=String(settings.max_tokens);
   await loadComponents();
+  await loadVision();
   say('Settings loaded. Changes apply to the next AI assessment.');
  }catch(e){say('Unable to load AI settings: '+e.message,true);}
 }

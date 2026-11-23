@@ -210,9 +210,79 @@ $('judgeAgree').onclick=async()=>{
   await rpc('ai_evaluation_agree',{p_id:judgeProposalId});
   button.textContent='Evaluation accepted';
   $('judgeAccepted').textContent='Agreement saved. Both suggested ratings were recorded under your account.';
-  await loadModelRatings();
+  await Promise.allSettled([loadModelRatings(),loadModelInsights()]);
  }catch(e){button.disabled=false;$('judgeAccepted').textContent='Could not save agreement: '+e.message}
 };
+const renderRows=(target,items,columns,action)=>{
+ const body=$(target);body.replaceChildren();
+ if(!items?.length){const tr=document.createElement('tr'),td=document.createElement('td');td.colSpan=columns.length+(action?1:0);td.textContent='No records for this selection.';tr.append(td);body.append(tr);return}
+ for(const item of items){const tr=document.createElement('tr');
+  for(const field of columns){const td=document.createElement('td');td.textContent=String(field(item)??'—');tr.append(td)}
+  if(action){const td=document.createElement('td');const btn=document.createElement('button');btn.type='button';btn.textContent=action.label;btn.onclick=()=>action.run(item,btn);td.append(btn);tr.append(td)}
+  body.append(tr)
+ }
+};
+const fmtDate=x=>x?new Date(x).toLocaleString():'—';
+const fmtSettings=x=>x?(x.model||'Global')+' · '+(x.timeout_ms==null?'Global':x.timeout_ms/1000+'s')+' · '+(x.tokens??'Global')+' tokens':'—';
+async function loadModelInsights(){
+ try{
+  const feature=$('leaderFeature').value||null;
+  const [sessions,leader,reliability,recs,history]=await Promise.all([
+   rpc('ai_evaluation_sessions',{p_limit:75}),
+   rpc('ai_evaluation_leaderboard',{p_component:feature}),
+   rpc('ai_model_reliability',{p_days:Number($('reliabilityDays').value)}),
+   rpc('ai_model_recommendations',{p_min_ratings:3}),
+   rpc('ai_model_config_list',{p_component:null})
+  ]);
+  const select=$('leaderFeature'),old=select.value;
+  const featureNames=[...new Set([...leader,...recs].map(x=>x.feature).filter(Boolean))].sort();
+  select.replaceChildren(new Option('All features',''));
+  for(const f of featureNames)select.add(new Option(f,f));
+  select.value=featureNames.includes(old)?old:'';
+  renderRows('sessionRows',sessions,[x=>fmtDate(x.created_at),x=>auditRows.find(a=>a.usage_id===x.source_usage_id)?.component_key||'Source '+String(x.source_usage_id).slice(0,8),x=>x.model_a,x=>x.model_b,x=>x.agreed_at?'Accepted':x.proposal_id?'Proposed':'Not approved'],{label:'Restore',run:async(x,btn)=>{
+   btn.disabled=true;
+   try{
+    const [a,b]=await Promise.all([rpc('ai_audit_inspect',{p_usage:x.usage_a}),rpc('ai_audit_inspect',{p_usage:x.usage_b})]);
+    const content=z=>z?.response_payload?.choices?.[0]?.message?.content||'(No retained output)';
+    evaluationRuns={A:x.usage_a,B:x.usage_b};judgeProposalId=x.proposal_id||null;
+    $('evalOutputA').textContent=content(a);$('evalOutputB').textContent=content(b);
+    $('evalMetaA').textContent=x.model_a+' · Saved request '+x.usage_a;
+    $('evalMetaB').textContent=x.model_b+' · Saved request '+x.usage_b;
+    $('evalModelA').value=x.model_a;
+    if([...$('evalModelB').options].some(o=>o.value===x.model_b))$('evalModelB').value=x.model_b;
+    $('judgeRun').disabled=!content(a)||!content(b);
+    $('judgeProposal').hidden=true;
+    if(x.proposed){showJudgeSuggestion(x.proposed,!!x.agreed_at);$('judgeStatus').textContent='Restored saved AI evaluation';}
+    else $('judgeStatus').textContent='Restored outputs. Generate an AI evaluation when ready.';
+    $('evalStatus').textContent='Restored saved comparison without new inference.';
+    document.getElementById('evaluationWorkbench').scrollIntoView({behavior:'smooth',block:'start'});
+   }catch(e){$('sessionStatus').textContent='Restore failed: '+e.message}
+   finally{btn.disabled=false}
+  }});
+  renderRows('leaderRows',leader,[x=>x.model,x=>x.feature,x=>x.rated,x=>x.quality??'Not rated',x=>money(x.average_cost),x=>x.average_ms==null?'—':x.average_ms+' ms']);
+  renderRows('reliabilityRows',reliability,[x=>x.model,x=>x.component_key,x=>x.requests,x=>x.successful,x=>x.errors,x=>x.timeouts,x=>x.empty_responses,x=>x.mean_ms==null?'—':x.mean_ms+' ms']);
+  const target=$('recommendations');target.replaceChildren();
+  const grouped=new Map();
+  for(const x of recs){if(!grouped.has(x.feature))grouped.set(x.feature,[]);grouped.get(x.feature).push(x)}
+  if(!grouped.size)target.textContent='Insufficient approved evaluations for recommendations yet.';
+  for(const [feature,rows] of grouped){
+   rows.sort((a,b)=>Number(b.quality)-Number(a.quality)||Number(a.avg_cost)-Number(b.avg_cost));
+   const p=document.createElement('p'),best=rows[0];
+   p.textContent=feature+': '+best.model+' · quality '+best.quality+'/5 across '+best.ratings+' ratings · average '+money(best.avg_cost)+' per evaluation. Verify reliability before applying.';
+   target.append(p)
+  }
+  renderRows('configHistoryRows',history,[x=>fmtDate(x.changed_at),x=>x.component_key,x=>fmtSettings(x.old_settings),x=>fmtSettings(x.new_settings),x=>x.changed_by||'System'],{label:'Rollback',run:async(x,btn)=>{
+   if(!confirm('Restore the previous AI settings for '+x.component_key+'? This creates another audited change.'))return;
+   btn.disabled=true;
+   try{await rpc('ai_model_config_restore',{p_id:x.id});$('configHistoryStatus').textContent='Previous configuration restored for '+x.component_key;await loadModelInsights()}
+   catch(e){$('configHistoryStatus').textContent='Rollback failed: '+e.message;btn.disabled=false}
+  }});
+  $('modelInsightsStatus').textContent='Updated '+new Date().toLocaleTimeString();
+ }catch(e){$('modelInsightsStatus').textContent='Model insights unavailable: '+e.message}
+}
+$('modelRefresh').onclick=loadModelInsights;
+$('leaderFeature').onchange=loadModelInsights;
+$('reliabilityDays').onchange=loadModelInsights;
 async function loadModelRatings(){
  try{
   const data=await rpc('ai_evaluation_summary'),target=$('modelRatings');target.replaceChildren();
@@ -264,6 +334,6 @@ App.onSession(async(session,profile)=>{
  authorized=!!session&&!!profile?.is_admin;
  if(!authorized){$('error').textContent='Global administrator access required.';$('dashboard').hidden=true;return}
  $('dashboard').hidden=false;
- await Promise.allSettled([load(),loadEvaluationModels()]);
+ await Promise.allSettled([load(),loadEvaluationModels(),loadModelInsights()]);
 });
 })();

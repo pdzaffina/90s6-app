@@ -1,0 +1,19 @@
+{
+  "id": "/",
+  "name": "90s6 Workspace",
+  "short_name": "90s6",
+  "description": "Strategy, systems, and execution in one workspace.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#101827",
+  "theme_color": "#101827",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

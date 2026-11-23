@@ -150,3 +150,9 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 @media(max-width:850px){.ap-hero-brands{justify-content:center;flex-wrap:wrap}.ap-hero-brands #apOrganizationLogo{width:110px;height:110px}.ap-hero-brands #apBrandAmpersand{font-size:44px}}
 
 @media(max-width:440px){.ap-hero-brands .ap-index{display:flex;font-size:64px;letter-spacing:-5px}.ap-hero-brands #apOrganizationLogo{width:82px;height:82px}.ap-hero-brands #apBrandAmpersand{font-size:30px}.ap-hero-brands{gap:10px}}
+
+/* AI-assisted organization palette preview. */
+.ap-org-ai-result{margin:12px 0 18px;padding:14px;border:1px solid var(--ap-line);border-radius:10px;background:var(--ap-paper)}
+.ap-org-ai-swatches{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0}
+.ap-org-ai-swatches>div{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:650}
+.ap-org-ai-swatch{width:36px;height:36px;display:inline-block;border-radius:8px;border:1px solid #94a3b855}

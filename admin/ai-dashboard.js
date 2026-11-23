@@ -249,8 +249,10 @@ async function loadModelInsights(){
     $('evalMetaA').textContent=x.model_a+' · Saved request '+x.usage_a;
     $('evalMetaB').textContent=x.model_b+' · Saved request '+x.usage_b;
     $('evalModelA').value=x.model_a;
+    if([...$('evalSource').options].some(o=>o.value===x.source_usage_id))$('evalSource').value=x.source_usage_id;
+    $('evalSelection').textContent='Restored source request '+x.source_usage_id;
     if([...$('evalModelB').options].some(o=>o.value===x.model_b))$('evalModelB').value=x.model_b;
-    $('judgeRun').disabled=!content(a)||!content(b);
+    $('judgeRun').disabled=content(a)==='(No retained output)'||content(b)==='(No retained output)';
     $('judgeProposal').hidden=true;
     if(x.proposed){showJudgeSuggestion(x.proposed,!!x.agreed_at);$('judgeStatus').textContent='Restored saved AI evaluation';}
     else $('judgeStatus').textContent='Restored outputs. Generate an AI evaluation when ready.';

@@ -149,11 +149,21 @@ $('purgeNow').onclick=async()=>{
 };
 async function loadEffectiveness(){
  try{
-  const groups=await rpc('ai_effectiveness_summary');const target=$('effectiveness');target.replaceChildren();
-  for(const g of groups){const card=document.createElement('div');card.className='metric';const title=document.createElement('span');title.textContent=g.ai_assisted?'AI-assisted exceptions':'Other exceptions';const big=document.createElement('strong');big.textContent=String(g.resolved)+' / '+g.total+' resolved';const sub=document.createElement('small');sub.textContent='Avg resolution: '+(g.avg_resolution_hours??'N/A')+' hours · Approved plans: '+g.approved_plans;card.append(title,big,sub);target.append(card)}
-  if(!groups.length)target.textContent='No exceptions recorded.';
+  const groups=await rpc('ai_effectiveness_detail',{p_days:Number($('effectivenessDays').value)});
+  const target=$('effectiveness');target.replaceChildren();
+  for(const g of groups){
+   const card=document.createElement('div');card.className='metric';
+   const title=document.createElement('span');title.textContent=g.ai_assisted?'AI-assisted exceptions':'Other exceptions';
+   const big=document.createElement('strong');big.textContent=String(g.resolution_pct??0)+'% resolved';
+   const sub=document.createElement('small');
+   sub.textContent=g.resolved+' of '+g.total+' resolved · Median resolution: '+(g.median_resolution_hours??'N/A')+' h · Mean: '+(g.mean_resolution_hours??'N/A')+' h · Approved remediation plans: '+g.approved_plans;
+   card.append(title,big,sub);target.append(card);
+  }
+  if(!groups.length)target.textContent='No exceptions detected in the selected window.';
  }catch(e){$('effectiveness').textContent='Effectiveness unavailable: '+e.message}
 }
+$('effectivenessDays').onchange=loadEffectiveness;
+$('effectivenessRefresh').onclick=loadEffectiveness;
 const invokeGateway=async payload=>{
  const {data,error}=await App.sb.functions.invoke('ai-platform-gateway',{body:payload});
  if(error){let message=error.message;try{const detail=await error.context?.json();message=detail?.error||message}catch{}throw Error(message)}

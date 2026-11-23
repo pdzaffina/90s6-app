@@ -79,6 +79,8 @@ function init(){if(!window.PortfolioAIContext)return;const host=document.querySe
  const guide=button('Portfolio Guide',()=>{answers={};step=0;renderGuide();dialog.showModal()});
  const scenario=button('✦ Generate Scenario',()=>{renderScenario();dialog.showModal()});scenario.classList.add('ap-ai-action');
  actions.append(guide,scenario);host.after(actions);document.body.append(dialog);
+ scenario.hidden=true;
+ App.onSession(async session=>{scenario.hidden=true;if(!session||!App.activeTenantId)return;try{const {data}=await App.sb.rpc('ai_platform_authorized',{p_tenant:App.activeTenantId,p_component:'platform_portfolio'});scenario.hidden=data!==true}catch(_){scenario.hidden=true}});
 }
 if(window.PortfolioAIContext)init();else document.addEventListener('portfolio-ai-ready',init,{once:true});
 })();

@@ -22,7 +22,7 @@ Deno.serve(async req=>{
   sb.rpc("ainbox_ai_component_enabled",{p_key:"verification"}),
   sb.rpc("ainbox_get_actions",{p_tenant:tenant,p_all:false}),
   sb.rpc("ainbox_get_exception_detail",{p_tenant:tenant,p_id:exception}),
-  sb.rpc("ainbox_ai_runtime_settings",{p_tenant:tenant})
+  sb.rpc("ainbox_ai_runtime_settings",{p_tenant:tenant,p_component:"verification"})
  ]);
  if(flag.error||flag.data!==true)return reply({error:"AI verification is disabled"},403);
  if(actions.error||details.error||settings.error)return reply({error:"Exception access denied"},403);

@@ -7,6 +7,36 @@ const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);i
 let allowed=false;let discoveredModels=[];let defaultModel='';
 const enabledToggle=$('globalAiEnabled');
 enabledToggle.onchange=async()=>{const desired=enabledToggle.checked;enabledToggle.disabled=true;try{await rpc('ainbox_ai_set_enabled',{p_enabled:desired});$('globalAiSwitchStatus').textContent=desired?'AI enabled':'AI disabled';}catch(e){enabledToggle.checked=!desired;say('Could not change AI state: '+e.message,true)}finally{enabledToggle.disabled=false}};
+let aiOrgSelected=new Set();
+let aiOrgNames=new Map();
+function renderAiOrgs(){
+ const chips=$('aiOrgChips');chips.replaceChildren();
+ for(const id of aiOrgSelected){
+  const pill=document.createElement('button');pill.type='button';pill.className='ap-btn';
+  pill.style.cssText='border-radius:7px;padding:6px 10px;background:#e8f2fb;color:#16466c';
+  pill.textContent=(aiOrgNames.get(id)||id)+' ×';
+  pill.title='Remove organization restriction';
+  pill.onclick=()=>{aiOrgSelected.delete(id);renderAiOrgs();$('aiOrgStatus').textContent='Unsaved changes';};
+  chips.append(pill);
+ }
+ if(!aiOrgSelected.size)chips.textContent='No organization-specific restrictions.';
+}
+$('aiOrgPicker').onchange=()=>{const id=$('aiOrgPicker').value;if(id){aiOrgSelected.add(id);renderAiOrgs();$('aiOrgPicker').value='';$('aiOrgStatus').textContent='Unsaved changes';}};
+$('aiOrgSave').onclick=async()=>{
+ const button=$('aiOrgSave');button.disabled=true;
+ try{await rpc('ai_organization_policy_save',{p_disabled_tenants:[...aiOrgSelected]});$('aiOrgStatus').textContent='Organization AI restrictions saved.';}
+ catch(e){$('aiOrgStatus').textContent='Unable to save: '+e.message;}
+ finally{button.disabled=false;}
+};
+async function loadAiOrgs(){
+ const {data:orgs,error}=await App.sb.from('tenants').select('id,name').order('name');if(error)throw error;
+ aiOrgNames=new Map((orgs||[]).map(o=>[o.id,o.name]));
+ const picker=$('aiOrgPicker');picker.replaceChildren();
+ const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='Select an organization…';picker.append(placeholder);
+ for(const o of orgs){const opt=document.createElement('option');opt.value=o.id;opt.textContent=o.name;picker.append(opt);}
+ const policy=await rpc('ai_organization_policy_get');
+ aiOrgSelected=new Set(policy.disabled_tenants||[]);renderAiOrgs();
+}
 const updateReasoning=()=>{const model=$('globalAiTestType').value==='alternate'?$('globalAiAlternateModel').value:$('globalAiModel').value;const supports=model.startsWith('openai/gpt-oss-');$('globalAiReasoning').disabled=!supports;if(!supports)$('globalAiReasoning').value='auto';};
 $('globalAiAlternateModel').onchange=updateReasoning;
 $('globalAiModel').onchange=updateReasoning;
@@ -145,6 +175,7 @@ async function load(){
   $('globalAiTokens').value=String(settings.max_tokens);
   await loadComponents();
   await loadVision();
+  await loadAiOrgs();
   say('Settings loaded. Changes apply to the next AI assessment.');
  }catch(e){say('Unable to load AI settings: '+e.message,true);}
 }

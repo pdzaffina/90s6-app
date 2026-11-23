@@ -148,3 +148,5 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 #orgBrandPreview{width:90px;height:90px;object-fit:contain;display:block;margin-bottom:8px}
 .ap-org-profile{padding:16px 0;border-bottom:1px solid var(--ap-line);margin-bottom:20px}
 @media(max-width:850px){.ap-hero-brands{justify-content:center;flex-wrap:wrap}.ap-hero-brands #apOrganizationLogo{width:110px;height:110px}.ap-hero-brands #apBrandAmpersand{font-size:44px}}
+
+@media(max-width:440px){.ap-hero-brands .ap-index{display:flex;font-size:64px;letter-spacing:-5px}.ap-hero-brands #apOrganizationLogo{width:82px;height:82px}.ap-hero-brands #apBrandAmpersand{font-size:30px}.ap-hero-brands{gap:10px}}

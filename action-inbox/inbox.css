@@ -83,3 +83,8 @@
 .ainbox .ainbox-ai-stale[hidden]{display:none!important}
 .ainbox .ainbox-ai-stale{display:inline-flex;align-items:center;gap:3px}
 .ainbox .ainbox-ai-dot{font-weight:900;font-size:13px;line-height:0}
+
+/* AI invocation is light blue; AI-generated output badges retain their purple styling. */
+.ainbox .ainbox-ai-heading #ainboxGenerateAI{background:#eaf2f8;color:#175b89;border:1px solid #a9cfe8}
+.ainbox .ainbox-ai-heading #ainboxGenerateAI:hover:not(:disabled){background:#d7ebfa;border-color:#78b6de}
+.ainbox .ainbox-ai-heading #ainboxGenerateAI:focus-visible{outline:3px solid #006bb655;outline-offset:2px}

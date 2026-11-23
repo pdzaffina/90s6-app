@@ -1,7 +1,16 @@
 (() => {
   'use strict';
   const $ = id => document.getElementById(id);
+  function updateHero(){
+    const logo=document.getElementById('apOrganizationLogo'),amp=document.getElementById('apBrandAmpersand');
+    if(!logo||!amp)return;
+    const image=App.organizationProfile?.logo_data;
+    logo.hidden=!image;amp.hidden=!image;
+    if(image)logo.src=image;else logo.removeAttribute('src');
+  }
+  window.addEventListener('organization-theme-changed',updateHero);
   App.onSession((session, profile) => {
+    updateHero();
     if (!session) return;
     if (!profile.intro_presentation_completed_at && !new URLSearchParams(location.search).has('intro_done') && localStorage.getItem('90s6-intro-launched:'+session.user.id)!=='yes') { localStorage.setItem('90s6-intro-launched:'+session.user.id,'yes'); location.replace('/training/90s6-introduction/?welcome=1'); return; }
     const hello = $('hello'); if (hello) hello.textContent = profile.full_name ? ', ' + profile.full_name : '';

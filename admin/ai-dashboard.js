@@ -1,5 +1,20 @@
 (()=>{'use strict';
 const $=id=>document.getElementById(id);
+function formatComparisonOutput(raw){
+ const value=String(raw??'').trim();
+ if(!value)return '';
+ let parsed;
+ try{parsed=JSON.parse(value)}catch{return value}
+ if(typeof parsed==='string')return formatComparisonOutput(parsed);
+ if(!parsed||Array.isArray(parsed)||typeof parsed!=='object')return value;
+ const subject=typeof parsed.subject==='string'?parsed.subject.trim():'';
+ const body=typeof parsed.body==='string'?parsed.body.trim():'';
+ if(body)return [subject,body].filter(Boolean).join('\n\n');
+ if(typeof parsed.content==='string')return parsed.content.trim();
+ if(typeof parsed.message==='string')return parsed.message.trim();
+ return JSON.stringify(parsed,null,2);
+}
+
 const rpc=async(name,args={})=>{const {data,error}=await App.sb.rpc(name,args);if(error)throw Error(error.message);return data};
 const money=v=>'$'+Number(v||0).toFixed(4);
 let auditRows=[];let selectedAudit=null;let authorized=false;let evaluationRuns={A:null,B:null};let judgeProposalId=null;
@@ -160,7 +175,7 @@ $('evalRun').onclick=async()=>{
    try{
     const t=performance.now(),result=await invokeGateway({tenant_id:original.tenant_id,source_usage_id:source,component:'evaluation',model});
     evaluationRuns[slot]=result.usage_id;
-    $(output).textContent=result.content;$(meta).textContent=model+' · '+(performance.now()-t).toFixed(0)+' ms · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · '+result.usage_id;
+    $(output).textContent=formatComparisonOutput(result.content);$(meta).textContent=model+' · '+(performance.now()-t).toFixed(0)+' ms · '+(result.input_tokens??'N/A')+' input · '+(result.output_tokens??'N/A')+' output · '+money(result.estimated_usd)+' · '+result.usage_id;
    }catch(e){failures++;$(output).textContent='Failed: '+e.message;$(meta).textContent=model+' · Failed'}
   }
   $('judgeRun').disabled=failures!==0;
@@ -243,7 +258,7 @@ async function loadModelInsights(){
    btn.disabled=true;
    try{
     const [a,b]=await Promise.all([rpc('ai_audit_inspect',{p_usage:x.usage_a}),rpc('ai_audit_inspect',{p_usage:x.usage_b})]);
-    const content=z=>z?.response_payload?.choices?.[0]?.message?.content||'(No retained output)';
+    const content=z=>formatComparisonOutput(z?.response_payload?.choices?.[0]?.message?.content||'(No retained output)');
     evaluationRuns={A:x.usage_a,B:x.usage_b};judgeProposalId=x.proposal_id||null;
     $('evalOutputA').textContent=content(a);$('evalOutputB').textContent=content(b);
     $('evalMetaA').textContent=x.model_a+' · Saved request '+x.usage_a;

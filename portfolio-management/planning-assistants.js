@@ -52,7 +52,7 @@ function renderScenario(){
  for(const [key,label] of [['capacity','Capacity-aware'],['impact','Strategic impact'],['speed','Fast delivery'],['risk','Reduce execution risk']])select.add(new Option(label,key));
  const preview=document.createElement('div');preview.style.cssText='max-height:290px;overflow:auto;margin:12px 0';
  const status=document.createElement('p');status.setAttribute('role','status');
- const name=document.createElement('input');name.placeholder='Scenario name';name.value='AI-assisted scenario '+new Date().toLocaleDateString();name.maxLength=120;name.style.cssText='box-sizing:border-box;width:100%;padding:10px';
+ const name=document.createElement('input');name.placeholder='Scenario name';name.value=(()=>{const d=new Date();const stamp=String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0')+d.getFullYear();const adjectives=['gilded','wobbly','cosmic','dancing','fuzzy','polka-dot','merry','whimsical','sparkling','bumbling'];const nouns=['lilly','platypus','teapot','turnip','noodle','penguin','waffle','banjo','pickle','marmalade'];const silly=adjectives[Math.floor(Math.random()*adjectives.length)]+' '+nouns[Math.floor(Math.random()*nouns.length)];return 'AI-assisted scenario - '+silly+' - '+stamp})();name.maxLength=120;name.style.cssText='box-sizing:border-box;width:100%;padding:10px';
  const save=button('Save as new draft',async()=>{
   const current=snapshot();if(!current?.canEdit){status.textContent='Editor access required.';return}
   if(!name.value.trim()){status.textContent='Enter a scenario name.';return}

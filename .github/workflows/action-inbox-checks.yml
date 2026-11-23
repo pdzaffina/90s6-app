@@ -43,6 +43,7 @@ jobs:
               assert f'alter table public.ainbox_{table} enable row level security' in foundation
               assert f'revoke all on public.ainbox_{table} from anon,authenticated' in foundation
           assert 'action_inbox' in Path('shared/app.js').read_text()
-          assert 'action_inbox' in Path('tenant-admin/tenant-admin.js').read_text()
+          tenant_admin=Path('tenant-admin/tenant-admin.js').read_text()
+          assert "from('application_registry')" in tenant_admin, 'Tenant admin must load the centralized application registry'
           print('Action Inbox static baseline validated:',len(files),'migrations')
           PY

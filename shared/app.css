@@ -137,3 +137,14 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 .ap-ai-action:hover:not(:disabled){background:#d7ebfa!important;border-color:#78b6de!important;box-shadow:0 2px 9px #006bb61a}
 .ap-ai-action:focus-visible{outline:3px solid #006bb655;outline-offset:2px}
 .ap-ai-action:disabled{opacity:.6;cursor:wait}
+
+/* Co-branding preserves the original 90s6 artwork when no organization logo exists. */
+.ap-hero-brands{display:flex;align-items:center;justify-content:flex-end;gap:clamp(12px,2vw,36px);min-width:0}
+.ap-hero-brands #apOrganizationLogo{width:clamp(105px,12vw,225px);height:clamp(105px,12vw,225px);object-fit:contain;flex:none}
+.ap-hero-brands #apBrandAmpersand{font-size:clamp(38px,5vw,90px);font-weight:700;color:var(--ap-slate);line-height:1}
+.ap-hero-brands .ap-index{flex:none}
+.ap-org-brand-fields{display:flex;gap:18px;flex-wrap:wrap;align-items:center;margin:15px 0}
+.ap-org-brand-fields label{display:flex;flex-direction:column;gap:7px;font-size:13px;font-weight:650}
+#orgBrandPreview{width:90px;height:90px;object-fit:contain;display:block;margin-bottom:8px}
+.ap-org-profile{padding:16px 0;border-bottom:1px solid var(--ap-line);margin-bottom:20px}
+@media(max-width:850px){.ap-hero-brands{justify-content:center;flex-wrap:wrap}.ap-hero-brands #apOrganizationLogo{width:110px;height:110px}.ap-hero-brands #apBrandAmpersand{font-size:44px}}

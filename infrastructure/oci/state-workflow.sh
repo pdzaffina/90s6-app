@@ -46,7 +46,7 @@ if [[ "$OPERATION" == budget ]]; then
   exit 0
 fi
 check_pilot_quota() {
-  ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query 'data[0].name' --raw-output 2>"$work/error")
+  ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query 'data[1].name' --raw-output 2>"$work/error")
   check_quota() {
     local service="$1" limit="$2" required="$3" scope="$4"
     local args=()
@@ -107,7 +107,7 @@ read -r cores memory storage < <(jq -er '
 [[ "$cores" =~ ^[0-9]+$ && "$memory" =~ ^[0-9]+$ && "$storage" =~ ^[0-9]+$ ]] || { echo "::error::Unable to determine incremental quota"; exit 1; }
 check_pilot_quota "$cores" "$memory" "$storage"
 attempts=1
-if [[ "${CAPACITY_RETRY:-false}" == true ]]; then attempts=12; fi
+ # Capacity retries disabled while testing AD-2.
 for ((attempt=1; attempt<=attempts; attempt++)); do
   echo "Provisioning attempt $attempt of $attempts"
   if terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1; then break; fi

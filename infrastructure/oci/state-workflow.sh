@@ -10,6 +10,30 @@ chmod 600 "$HOME/.oci/config" "$work/key.pem"
 export OCI_private_key_path="$work/key.pem"
 export OCI_tenancy_ocid="$OCI_TENANCY_OCID" OCI_user_ocid="$OCI_USER_OCID" OCI_fingerprint="$OCI_FINGERPRINT" OCI_region="$OCI_REGION"
 export TF_IN_AUTOMATION=true
+if [[ "$OPERATION" == budget ]]; then
+  : "${OCI_BUDGET_EMAIL:?Budget email secret required}"
+  name=90s6-pilot-cost-guardrail
+  oci budgets budget list --compartment-id "$OCI_TENANCY_OCID" --all > "$work/budgets.json" 2>"$work/error"
+  id=$(jq -r --arg name "$name" '[.data[] | select(."display-name" == $name and ."lifecycle-state" == "ACTIVE")] | if length > 1 then error("Duplicate budgets") else .[0].id // empty end' "$work/budgets.json")
+  if [[ -z "$id" ]]; then
+    targets=$(jq -cn --arg id "$OCI_TENANCY_OCID" '[$id]')
+    oci budgets budget create --compartment-id "$OCI_TENANCY_OCID" --amount 5 --reset-period MONTHLY --target-type COMPARTMENT --targets "$targets" --display-name "$name" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget creation failed"; exit 1; }
+    id=$(jq -er '.data.id' "$work/budget.json")
+  fi
+  oci budgets budget get --budget-id "$id" > "$work/budget.json" 2>"$work/error"
+  jq -e '.data | .amount == 5 and ."reset-period" == "MONTHLY"' "$work/budget.json" >/dev/null || { echo "::error::Existing budget does not match requested settings"; exit 1; }
+  for spec in ACTUAL:50 ACTUAL:80 ACTUAL:100 FORECAST:100; do
+    type=${spec%:*}
+    threshold=${spec#*:}
+    oci budgets alert-rule list --budget-id "$id" --all > "$work/rules.json" 2>"$work/error"
+    if ! jq -e --arg type "$type" --argjson threshold "$threshold" --arg email "$OCI_BUDGET_EMAIL" 'any(.data[]; .type == $type and .threshold == $threshold and ."threshold-type" == "PERCENTAGE" and .recipients == $email)' "$work/rules.json" >/dev/null; then
+      oci budgets alert-rule create --budget-id "$id" --type "$type" --threshold "$threshold" --threshold-type PERCENTAGE --recipients "$OCI_BUDGET_EMAIL" > "$work/rule.json" 2>"$work/error" || { echo "::error::Budget alert creation failed"; exit 1; }
+    fi
+    echo "Verified or created $type alert at $threshold percent."
+  done
+  echo "Five dollar monthly budget configured."
+  exit 0
+fi
 namespace=$(oci os ns get --query data --raw-output 2>"$work/error")
 bucket=90s6-pilot-tfstate
 if [[ "$OPERATION" == bootstrap ]]; then

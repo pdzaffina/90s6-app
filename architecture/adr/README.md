@@ -18,3 +18,7 @@ These initial records describe decisions inferred from the repository and should
 - [0008 Explicit-record reconciliation](0008-action-inbox-reconciliation.md)
 - [0009 Item-level Done status](0009-action-inbox-item-status-completion.md)
 - [0010 Versioned rules and scan operations](0010-action-inbox-rule-versions-and-operations.md)
+
+## Backend portability
+
+- [0011 Portable SQLite backend](0011-portable-sqlite-backend.md)

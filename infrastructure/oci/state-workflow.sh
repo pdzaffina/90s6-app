@@ -22,12 +22,21 @@ if [[ "$OPERATION" == quota ]]; then
     local service="$1" limit="$2" required="$3" scope="$4"
     local args=()
     if [[ "$scope" == ad ]]; then args+=(--availability-domain "$ad"); fi
-    oci limits resource-availability get --compartment-id "$OCI_TENANCY_OCID" --service-name "$service" --limit-name "$limit" "${args[@]}" > "$work/quota.json" 2>"$work/error" || { echo "::error::Unable to verify $limit ($scope)"; return 1; }
-    jq -e --argjson required "$required" '.data.available >= $required' "$work/quota.json" >/dev/null || { echo "::error::Insufficient available quota for $limit ($scope)"; return 1; }
+    oci limits resource-availability get --compartment-id "$OCI_TENANCY_OCID" --service-name "$service" --limit-name "$limit" "${args[@]}" > "$work/quota.json" 2>"$work/error" || { echo "::error::Unable to verify $limit ($scope)"; python3 -c 'import json,re,sys
+s=open(sys.argv[1]).read()
+for m in re.finditer(r"\{",s):
+ try:
+  d,_=json.JSONDecoder().raw_decode(s[m.start():])
+  for k in ("status","code"):
+   v=str(d.get(k,"unknown"))
+   print(k+": "+(v if re.fullmatch(r"[A-Za-z0-9_ -]{1,80}",v) else "redacted"))
+  break
+ except ValueError: continue' "$work/error"; return 1; }
+    jq -e --argjson required "$required" '(.data.available | type) == "number" and .data.available >= $required' "$work/quota.json" >/dev/null || { echo "::error::Insufficient available quota for $limit ($scope)"; return 1; }
     echo "$limit ($scope): sufficient available quota."
   }
-  check_quota compute standard-a1-core-count 2 region
-  check_quota compute standard-a1-memory-count 12 region
+  check_quota compute standard-a1-core-count 2 ad
+  check_quota compute standard-a1-memory-count 12 ad
   check_quota block-storage total-storage-gb 150 ad
   echo "Requested quota checks passed. Physical host capacity and free-tier billing eligibility are not guaranteed."
   exit 0

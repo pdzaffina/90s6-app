@@ -10,6 +10,31 @@ chmod 600 "$HOME/.oci/config" "$work/key.pem"
 export OCI_private_key_path="$work/key.pem"
 export OCI_tenancy_ocid="$OCI_TENANCY_OCID" OCI_user_ocid="$OCI_USER_OCID" OCI_fingerprint="$OCI_FINGERPRINT" OCI_region="$OCI_REGION"
 export TF_IN_AUTOMATION=true
+if [[ "$OPERATION" == inspect-vcn || "$OPERATION" == delete-vcn ]]; then
+  target=ocid1.vcn.oc1.phx.amaaaaaamerpqeiavvjmditpssvjjaa2wdtai2tb3bcajswnxol2pc7bhruq
+  oci network vcn get --vcn-id "$target" > "$work/vcn.json"
+  compartment=$(jq -er '.data."compartment-id"' "$work/vcn.json")
+  jq '{name:.data."display-name",state:.data."lifecycle-state",cidrs:.data."cidr-blocks"}' "$work/vcn.json"
+  oci iam compartment list --compartment-id "$OCI_TENANCY_OCID" --compartment-id-in-subtree true --all > "$work/compartments.json"
+  if jq -e --arg c "$compartment" 'any(.data[]; .id == $c and .name == "90s6")' "$work/compartments.json" >/dev/null; then
+    echo "::error::Refusing to touch pilot compartment"; exit 1
+  fi
+  # Fail closed: do not remove any child resources automatically.
+  for kind in subnet internet-gateway nat-gateway service-gateway local-peering-gateway network-security-group route-table security-list dhcp-options; do
+    oci network "$kind" list --compartment-id "$compartment" --vcn-id "$target" --all > "$work/$kind.json"
+    echo "$kind:"
+    jq -r '.data[] | [."display-name", ."lifecycle-state"] | @tsv' "$work/$kind.json"
+  done
+  if [[ "$OPERATION" == inspect-vcn ]]; then exit 0; fi
+  [[ "$CONFIRMATION" == DELETE-VCN ]] || { echo "::error::Explicit deletion confirmation required"; exit 1; }
+  for kind in subnet internet-gateway nat-gateway service-gateway local-peering-gateway network-security-group; do
+    jq -e '.data | length == 0' "$work/$kind.json" >/dev/null || { echo "::error::VCN has $kind dependencies; no deletion attempted"; exit 1; }
+  done
+  # OCI itself rejects deletion when any remaining dependencies exist.
+  oci network vcn delete --vcn-id "$target" --force --wait-for-state TERMINATED
+  echo "Target VCN deleted."
+  exit 0
+fi
 if [[ "$OPERATION" == budget ]]; then
   oci budgets budget budget list --compartment-id "$OCI_TENANCY_OCID" --all > "$work/budgets.json" 2>"$work/error" || { echo "::error::Budget lookup failed"; exit 1; }
   jq -e --arg root "$OCI_TENANCY_OCID" 'any(.data[]; ."display-name" == "Cost_Tracker" and ."lifecycle-state" == "ACTIVE" and .amount == 1 and ."reset-period" == "MONTHLY" and ((.targets // []) | index($root) != null))' "$work/budgets.json" >/dev/null || { echo "::error::Existing budget could not be verified"; exit 1; }

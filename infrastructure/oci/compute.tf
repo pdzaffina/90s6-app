@@ -1,3 +1,19 @@
+variable "pilot_ocpus" {
+  type = number
+  default = 2
+  validation {
+    condition = contains([1, 2], var.pilot_ocpus)
+    error_message = "Pilot supports 1 or 2 OCPUs."
+  }
+}
+variable "pilot_memory_gb" {
+  type = number
+  default = 12
+  validation {
+    condition = contains([6, 8, 12], var.pilot_memory_gb)
+    error_message = "Pilot supports 6, 8 or 12 GB."
+  }
+}
 data "oci_core_images" "ubuntu_arm" {
   compartment_id = var.tenancy_ocid
   operating_system = "Canonical Ubuntu"
@@ -12,8 +28,8 @@ resource "oci_core_instance" "pilot" {
   display_name = "90s6-pilot"
   shape = "VM.Standard.A1.Flex"
   shape_config {
-    ocpus = 2
-    memory_in_gbs = 12
+    ocpus = var.pilot_ocpus
+    memory_in_gbs = var.pilot_memory_gb
   }
   create_vnic_details {
     subnet_id = oci_core_subnet.pilot.id

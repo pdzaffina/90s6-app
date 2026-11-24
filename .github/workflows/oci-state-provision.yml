@@ -5,10 +5,10 @@ on:
       operation:
         description: Operation (bootstrap creates only state bucket)
         type: choice
-        options: [bootstrap, plan, apply]
+        options: [bootstrap, budget, quota, plan, apply, inspect-vcn, delete-vcn]
         default: plan
       confirmation:
-        description: Enter CREATE-PILOT to authorize apply
+        description: Enter CREATE-PILOT for apply or DELETE-VCN for deletion
         type: string
         required: false
 permissions:

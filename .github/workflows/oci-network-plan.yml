@@ -13,7 +13,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.10.5
+          terraform_version: 1.12.2
           terraform_wrapper: false
       - name: Validate and preview infrastructure
         working-directory: infrastructure/oci

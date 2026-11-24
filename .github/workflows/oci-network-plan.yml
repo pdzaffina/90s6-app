@@ -1,0 +1,39 @@
+name: OCI Pilot - Network Plan
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  plan:
+    if: github.ref == 'refs/heads/feature/oci-deployment'
+    environment: oci-pilot
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.10.5
+          terraform_wrapper: false
+      - name: Validate and preview infrastructure
+        working-directory: infrastructure/oci
+        shell: bash
+        env:
+          OCI_USER_OCID: ${{ secrets.OCI_USER_OCID }}
+          OCI_TENANCY_OCID: ${{ secrets.OCI_TENANCY_OCID }}
+          OCI_FINGERPRINT: ${{ secrets.OCI_FINGERPRINT }}
+          OCI_PRIVATE_KEY: ${{ secrets.OCI_PRIVATE_KEY }}
+          OCI_REGION: ${{ vars.OCI_REGION }}
+          TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
+          TF_VAR_region: ${{ vars.OCI_REGION }}
+          TF_IN_AUTOMATION: "true"
+        run: |
+          set -euo pipefail
+          umask 077
+          work=$(mktemp -d)
+          trap 'rm -rf "$work"' EXIT
+          terraform init -backend=false > "$work/init.log" 2>&1 || { echo "::error::Terraform initialization failed"; exit 1; }
+          terraform validate
+          terraform plan -input=false -out="$work/preview.tfplan" > "$work/plan.log" 2>&1 || { echo "::error::Plan failed; inspect configuration privately before retrying"; exit 1; }
+          terraform show -json "$work/preview.tfplan" | jq -r '.resource_changes[] | select(.mode == "managed") | [.address, (.change.actions | join(","))] | @tsv'
+          echo "Read-only preview complete. No resources created."

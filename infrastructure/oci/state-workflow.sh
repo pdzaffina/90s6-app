@@ -89,6 +89,32 @@ if [[ "$OPERATION" == bootstrap ]]; then exit 0; fi
 printf 'terraform {\n backend "oci" {}\n}\n' > backend.runtime.tf
 terraform init -input=false -backend-config="bucket=$bucket" -backend-config="namespace=$namespace" -backend-config="key=pilot/terraform.tfstate" >"$work/init" 2>&1 || { echo "::error::Remote backend initialization failed"; exit 1; }
 terraform validate
+if [[ "$OPERATION" == reset-plan || "$OPERATION" == reset ]]; then
+  # Never reset a pilot that has acquired a compute instance or attached storage.
+  terraform state list > "$work/reset-state"
+  if grep -Eq '^oci_core_(instance|volume_attachment|public_ip)\.' "$work/reset-state"; then
+    echo "::error::Compute, attachment or IP exists; manual review required"; exit 1
+  fi
+  # Keep only the compartment configuration; normal plan deletes removed resources.
+  python3 - <<'PY'
+from pathlib import Path
+p=Path("main.tf")
+s=p.read_text()
+p.write_text(s[:s.index('resource "oci_core_vcn"')])
+for name in ("compute.tf","management.tf"):
+    Path(name).unlink()
+PY
+  terraform plan -input=false -lock-timeout=60s -out="$work/reset" > "$work/reset.log" 2>&1 || { echo "::error::Reset plan failed"; exit 1; }
+  terraform show -json "$work/reset" > "$work/reset.json"
+  jq -r '.resource_changes[] | select(.mode=="managed") | [.address, (.change.actions|join(","))] | @tsv' "$work/reset.json"
+  jq -e 'all(.resource_changes[] | select(.mode=="managed"); .change.actions==["no-op"] or (.change.actions==["delete"] and (.address as $a | ["oci_core_vcn.pilot","oci_core_internet_gateway.pilot","oci_core_route_table.pilot","oci_core_security_list.pilot","oci_core_subnet.pilot","oci_core_volume.data","oci_identity_policy.pilot_run_command","oci_identity_dynamic_group.pilot"] | index($a)!=null)))' "$work/reset.json" >/dev/null || { echo "::error::Unexpected reset changes; stopping"; exit 1; }
+  if [[ "$OPERATION" == reset-plan ]]; then exit 0; fi
+  [[ "$CONFIRMATION" == RESET-PILOT ]] || { echo "::error::Reset confirmation required"; exit 1; }
+  terraform apply -input=false -lock-timeout=60s "$work/reset" > "$work/reset-apply.log" 2>&1 || { echo "::error::Reset failed; inspect state before retrying"; exit 1; }
+  terraform state list
+  echo "Pilot reset completed; compartment and state bucket retained."
+  exit 0
+fi
 echo "Existing managed resources:"
 terraform state list 2>"$work/state-error" || echo "State listing unavailable (possibly empty)."
 terraform plan -input=false -lock-timeout=60s -out="$work/plan" >"$work/plan.log" 2>&1 || { echo "::error::Remote plan failed"; exit 1; }

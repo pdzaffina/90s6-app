@@ -21,7 +21,11 @@ if [[ "$OPERATION" == inspect-vcn || "$OPERATION" == delete-vcn ]]; then
   fi
   # Fail closed: do not remove any child resources automatically.
   for kind in subnet internet-gateway nat-gateway service-gateway local-peering-gateway network-security-group route-table security-list dhcp-options; do
-    oci network "$kind" list --compartment-id "$compartment" --vcn-id "$target" --all > "$work/$kind.json"
+    if [[ "$kind" == network-security-group ]]; then
+      oci network nsg list --compartment-id "$compartment" --vcn-id "$target" --all > "$work/$kind.json"
+    else
+      oci network "$kind" list --compartment-id "$compartment" --vcn-id "$target" --all > "$work/$kind.json"
+    fi
     echo "$kind:"
     jq -r '.data[] | [."display-name", ."lifecycle-state"] | @tsv' "$work/$kind.json"
   done

@@ -5,7 +5,7 @@ on:
       operation:
         description: Operation (bootstrap creates only state bucket)
         type: choice
-        options: [bootstrap, plan, apply]
+        options: [bootstrap, budget, plan, apply]
         default: plan
       confirmation:
         description: Enter CREATE-PILOT to authorize apply
@@ -43,6 +43,7 @@ jobs:
           OCI_REGION: ${{ vars.OCI_REGION }}
           TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
           TF_VAR_region: ${{ vars.OCI_REGION }}
+          OCI_BUDGET_EMAIL: ${{ secrets.OCI_BUDGET_EMAIL }}
           OPERATION: ${{ inputs.operation }}
           CONFIRMATION: ${{ inputs.confirmation }}
         run: bash state-workflow.sh

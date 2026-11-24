@@ -106,7 +106,13 @@ read -r cores memory storage < <(jq -er '
   [$cores,$memory,$storage] | @tsv' "$work/plan.json")
 [[ "$cores" =~ ^[0-9]+$ && "$memory" =~ ^[0-9]+$ && "$storage" =~ ^[0-9]+$ ]] || { echo "::error::Unable to determine incremental quota"; exit 1; }
 check_pilot_quota "$cores" "$memory" "$storage"
-terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."
+attempts=1
+if [[ "${CAPACITY_RETRY:-false}" == true ]]; then attempts=12; fi
+for ((attempt=1; attempt<=attempts; attempt++)); do
+  echo "Provisioning attempt $attempt of $attempts"
+  if terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1; then break; fi
+  if (( attempt == attempts )) || ! grep -qi 'Out of host capacity' "$work/apply.log" || ! grep -q 'oci_core_instance.pilot' "$work/apply.log" || [[ $(grep -c 'Error:' "$work/apply.log") != 1 ]]; then
+    echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."
 python3 - "$work/apply.log" <<'PY'
 import re,sys
 s=open(sys.argv[1]).read()
@@ -120,6 +126,16 @@ for line in s.splitlines():
             print("Diagnostic: "+phrase)
 PY
 terraform state list 2>"$work/state-error" || true
-exit 1; }
+
+    exit 1
+  fi
+  echo "OCI host capacity unavailable; retrying in 4 minutes."
+  sleep 240
+  terraform plan -input=false -lock-timeout=60s -out="$work/plan" > "$work/plan.log" 2>&1 || { echo "::error::Retry plan failed"; exit 1; }
+  terraform show -json "$work/plan" > "$work/plan.json"
+  jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == ["no-op"] or (.change.actions == ["create"] and (.address == "oci_core_instance.pilot" or .address == "oci_core_public_ip.pilot" or .address == "oci_core_volume_attachment.data")))' "$work/plan.json" >/dev/null || { echo "::error::Unexpected retry plan; stopping"; exit 1; }
+  jq -e 'any(.resource_changes[]; .address == "oci_core_instance.pilot" and .change.actions == ["create"])' "$work/plan.json" >/dev/null || { echo "::error::Compute no longer pending; inspect state"; exit 1; }
+  check_pilot_quota 2 12 50
+done
 echo "Pilot infrastructure apply completed."
 terraform state list

@@ -58,6 +58,8 @@ if [[ "$OPERATION" == bootstrap ]]; then exit 0; fi
 printf 'terraform {\n backend "oci" {}\n}\n' > backend.runtime.tf
 terraform init -input=false -backend-config="bucket=$bucket" -backend-config="namespace=$namespace" -backend-config="key=pilot/terraform.tfstate" >"$work/init" 2>&1 || { echo "::error::Remote backend initialization failed"; exit 1; }
 terraform validate
+echo "Existing managed resources:"
+terraform state list 2>"$work/state-error" || echo "State listing unavailable (possibly empty)."
 terraform plan -input=false -lock-timeout=60s -out="$work/plan" >"$work/plan.log" 2>&1 || { echo "::error::Remote plan failed"; exit 1; }
 terraform show -json "$work/plan" > "$work/plan.json"
 jq -r '.resource_changes[] | select(.mode == "managed") | [.address, (.change.actions | join(","))] | @tsv' "$work/plan.json"
@@ -67,6 +69,20 @@ jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == 
 if jq -e 'any(.resource_changes[]; .mode == "managed" and .address == "oci_core_instance.pilot" and .change.actions == ["create"])' "$work/plan.json" >/dev/null; then
   check_pilot_quota
 fi
-terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."; exit 1; }
+terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."
+python3 - "$work/apply.log" <<'PY'
+import re,sys
+s=open(sys.argv[1]).read()
+for line in s.splitlines():
+    clean=re.sub(r'\x1b\[[0-9;]*m','',line)
+    for pattern in [r'\b[45][0-9]{2}-[A-Za-z][A-Za-z0-9_]+\b',r'\boci_[a-z_]+\.[a-z_]+\b']:
+        for match in re.findall(pattern,clean):
+            print("Diagnostic: "+match)
+    for phrase in ["Out of host capacity","Out of capacity","LimitExceeded","NotAuthorizedOrNotFound","InvalidParameter","IncorrectState","Conflict"]:
+        if phrase.lower() in clean.lower():
+            print("Diagnostic: "+phrase)
+PY
+terraform state list 2>"$work/state-error" || true
+exit 1; }
 echo "Pilot infrastructure apply completed."
 terraform state list

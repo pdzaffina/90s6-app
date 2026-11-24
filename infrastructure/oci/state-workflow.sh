@@ -12,12 +12,17 @@ export OCI_tenancy_ocid="$OCI_TENANCY_OCID" OCI_user_ocid="$OCI_USER_OCID" OCI_f
 export TF_IN_AUTOMATION=true
 if [[ "$OPERATION" == budget ]]; then
   : "${OCI_BUDGET_EMAIL:?Budget email secret required}"
-  name=90s6-pilot-cost-guardrail
+  name=pilot-90s6-cost-guardrail
   oci budgets budget budget list --compartment-id "$OCI_TENANCY_OCID" --all > "$work/budgets.json" 2>"$work/error" || { echo "::error::Budget listing failed"; exit 1; }
-  id=$(jq -r --arg name "$name" '[.data[] | select(."display-name" == $name and ."lifecycle-state" == "ACTIVE")] | if length > 1 then error("Duplicate budgets") else .[0].id // empty end' "$work/budgets.json")
+  id=$(jq -r --arg name "$name" '[.data[] | select((."display-name" == $name or ."display-name" == "90s6-pilot-cost-guardrail") and ."lifecycle-state" == "ACTIVE")] | if length > 1 then error("Duplicate budgets") else .[0].id // empty end' "$work/budgets.json")
   if [[ -z "$id" ]]; then
     targets=$(jq -cn --arg id "$OCI_TENANCY_OCID" '[$id]')
-    oci budgets budget budget create --compartment-id "$OCI_TENANCY_OCID" --amount 5 --reset-period MONTHLY --target-type COMPARTMENT --targets "$targets" --display-name "$name" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget creation failed"; exit 1; }
+    oci budgets budget budget create --compartment-id "$OCI_TENANCY_OCID" --amount 5 --reset-period MONTHLY --target-type COMPARTMENT --targets "$targets" --display-name "$name" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget creation failed"; python3 -c 'import json,re,sys; s=open(sys.argv[1]).read(); m=re.search(r"\{",s); d={};
+if m:
+ try: d=json.loads(s[m.start():])
+ except ValueError: pass
+for k in ("status","code"):
+ v=str(d.get(k,"unknown")); print(k+": "+(v if re.fullmatch(r"[A-Za-z0-9_ -]{1,80}",v) else "redacted"))' "$work/error"; exit 1; }
     id=$(jq -er '.data.id' "$work/budget.json")
   fi
   oci budgets budget budget get --budget-id "$id" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget lookup failed"; exit 1; }

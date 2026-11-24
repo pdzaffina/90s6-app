@@ -48,6 +48,7 @@ resource "oci_core_public_ip" "pilot" {
   private_ip_id = data.oci_core_private_ips.pilot.private_ips[0].id
 }
 resource "oci_core_volume_attachment" "data" {
+  count = var.availability_domain_index == 0 ? 1 : 0
   attachment_type = "paravirtualized"
   instance_id = oci_core_instance.pilot.id
   volume_id = oci_core_volume.data.id

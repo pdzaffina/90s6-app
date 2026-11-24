@@ -5,7 +5,7 @@ on:
       operation:
         description: Operation (bootstrap creates only state bucket)
         type: choice
-        options: [bootstrap, budget, quota, plan, apply, inspect-vcn, delete-vcn]
+        options: [bootstrap, budget, quota, plan, apply, inspect-vcn, delete-vcn, reset-plan, reset]
         default: plan
       capacity_retry:
         description: Retry host capacity failures up to 12 attempts

@@ -46,7 +46,7 @@ if [[ "$OPERATION" == budget ]]; then
   exit 0
 fi
 check_pilot_quota() {
-  ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query 'data[1].name' --raw-output 2>"$work/error")
+  ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query "data[${TF_VAR_availability_domain_index:-0}].name" --raw-output 2>"$work/error")
   check_quota() {
     local service="$1" limit="$2" required="$3" scope="$4"
     local args=()
@@ -115,53 +115,54 @@ PY
   echo "Pilot reset completed; compartment and state bucket retained."
   exit 0
 fi
-echo "Existing managed resources:"
-terraform state list 2>"$work/state-error" || echo "State listing unavailable (possibly empty)."
-terraform plan -input=false -lock-timeout=60s -out="$work/plan" >"$work/plan.log" 2>&1 || { echo "::error::Remote plan failed"; exit 1; }
-terraform show -json "$work/plan" > "$work/plan.json"
-jq -r '.resource_changes[] | select(.mode == "managed") | [.address, (.change.actions | join(","))] | @tsv' "$work/plan.json"
-if [[ "$OPERATION" == plan ]]; then exit 0; fi
-[[ "$OPERATION" == apply && "$CONFIRMATION" == CREATE-PILOT ]] || { echo "::error::Explicit apply confirmation required"; exit 1; }
-jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == ["create"] or .change.actions == ["no-op"])' "$work/plan.json" >/dev/null || { echo "::error::Only creates and no-ops allowed"; exit 1; }
-# Derive incremental demand from the exact saved plan, not the original target.
-read -r cores memory storage < <(jq -er '
-  [.resource_changes[] | select(.mode == "managed" and .change.actions == ["create"])] as $new |
-  ([$new[] | select(.address == "oci_core_instance.pilot") | .change.after.shape_config[0].ocpus] | add // 0) as $cores |
-  ([$new[] | select(.address == "oci_core_instance.pilot") | .change.after.shape_config[0].memory_in_gbs] | add // 0) as $memory |
-  ([$new[] | if .address == "oci_core_instance.pilot" then (.change.after.source_details[0].boot_volume_size_in_gbs | tonumber) elif .address == "oci_core_volume.data" then (.change.after.size_in_gbs | tonumber) else 0 end] | add // 0) as $storage |
-  [$cores,$memory,$storage] | @tsv' "$work/plan.json")
-[[ "$cores" =~ ^[0-9]+$ && "$memory" =~ ^[0-9]+$ && "$storage" =~ ^[0-9]+$ ]] || { echo "::error::Unable to determine incremental quota"; exit 1; }
-check_pilot_quota "$cores" "$memory" "$storage"
-attempts=1
- # Capacity retries disabled while testing AD-2.
-for ((attempt=1; attempt<=attempts; attempt++)); do
-  echo "Provisioning attempt $attempt of $attempts"
-  if terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1; then break; fi
-  if (( attempt == attempts )) || ! grep -qi 'Out of host capacity' "$work/apply.log" || ! grep -q 'oci_core_instance.pilot' "$work/apply.log" || [[ $(grep -c 'Error:' "$work/apply.log") != 1 ]]; then
-    echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."
-python3 - "$work/apply.log" <<'PY'
-import re,sys
-s=open(sys.argv[1]).read()
-for line in s.splitlines():
-    clean=re.sub(r'\x1b\[[0-9;]*m','',line)
-    for pattern in [r'\b[45][0-9]{2}-[A-Za-z][A-Za-z0-9_]+\b',r'\boci_[a-z_]+\.[a-z_]+\b']:
-        for match in re.findall(pattern,clean):
-            print("Diagnostic: "+match)
-    for phrase in ["Out of host capacity","Out of capacity","LimitExceeded","NotAuthorizedOrNotFound","InvalidParameter","IncorrectState","Conflict"]:
-        if phrase.lower() in clean.lower():
-            print("Diagnostic: "+phrase)
-PY
-terraform state list 2>"$work/state-error" || true
-
-    exit 1
-  fi
-  echo "OCI host capacity unavailable; retrying in 4 minutes."
-  sleep 240
-  terraform plan -input=false -lock-timeout=60s -out="$work/plan" > "$work/plan.log" 2>&1 || { echo "::error::Retry plan failed"; exit 1; }
+# Compute-first orchestration. State is authoritative after successful launch.
+[[ "$OPERATION" == plan || ( "$OPERATION" == apply && "$CONFIRMATION" == CREATE-PILOT ) ]] || { echo "::error::Explicit apply confirmation required"; exit 1; }
+make_plan() {
+  terraform plan -input=false -lock-timeout=60s "$@" -out="$work/plan" > "$work/plan.log" 2>&1 || { echo "::error::Plan failed"; return 1; }
   terraform show -json "$work/plan" > "$work/plan.json"
-  jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == ["no-op"] or (.change.actions == ["create"] and (.address == "oci_core_instance.pilot" or .address == "oci_core_public_ip.pilot" or .address == "oci_core_volume_attachment.data")))' "$work/plan.json" >/dev/null || { echo "::error::Unexpected retry plan; stopping"; exit 1; }
-  jq -e 'any(.resource_changes[]; .address == "oci_core_instance.pilot" and .change.actions == ["create"])' "$work/plan.json" >/dev/null || { echo "::error::Compute no longer pending; inspect state"; exit 1; }
-  check_pilot_quota 2 12 50
-done
+  jq -r '.resource_changes[] | select(.mode=="managed") | [.address, (.change.actions|join(","))] | @tsv' "$work/plan.json"
+  jq -e 'all(.resource_changes[] | select(.mode=="managed"); .change.actions==["create"] or .change.actions==["no-op"])' "$work/plan.json" >/dev/null || { echo "::error::Unsafe plan"; return 1; }
+}
+read_winner() {
+  terraform show -json > "$work/current.json"
+  winner=$(jq -r '[.values.root_module.resources[]? | select(.address=="oci_core_instance.pilot") | .values.availability_domain][0] // empty' "$work/current.json")
+  if [[ -n "$winner" ]]; then
+    oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" > "$work/ads.json"
+    export TF_VAR_availability_domain_index=$(jq -er --arg ad "$winner" '[.data[].name] | index($ad) // error("Unknown AD")' "$work/ads.json")
+    echo "Compute location locked: AD-$((TF_VAR_availability_domain_index+1))"
+  fi
+}
+read_winner
+if [[ -z "$winner" ]]; then
+  # No data volume may precede compute.
+  if jq -e 'any(.values.root_module.resources[]?; .address=="oci_core_volume.data")' "$work/current.json" >/dev/null; then echo "::error::Existing volume requires review"; exit 1; fi
+  for ((attempt=0; attempt<60; attempt++)); do
+    export TF_VAR_availability_domain_index=$((attempt%3))
+    echo "Compute attempt $((attempt+1))/60, AD-$((TF_VAR_availability_domain_index+1))"
+    make_plan -target=oci_core_instance.pilot
+    if [[ "$OPERATION" == plan ]]; then exit 0; fi
+    check_pilot_quota 2 12 50
+    if terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1; then
+      read_winner
+      [[ -n "$winner" ]] || { echo "::error::Compute missing after apply"; exit 1; }
+      break
+    fi
+    read_winner
+    if [[ -n "$winner" ]]; then echo "::error::Compute exists after failed apply; rerun to resume"; exit 1; fi
+    if ! grep -qi 'Out of host capacity' "$work/apply.log" || ! grep -q 'oci_core_instance.pilot' "$work/apply.log" || [[ $(grep -c 'Error:' "$work/apply.log") != 1 ]]; then
+      echo "::error::Non-capacity failure; stopping"
+      grep -oE '[45][0-9]{2}-[A-Za-z][A-Za-z0-9_]+' "$work/apply.log" | sort -u || true
+      exit 1
+    fi
+    echo "Host capacity unavailable."
+    if (( attempt < 59 )); then sleep 120; fi
+  done
+fi
+[[ -n "$winner" ]] || { echo "::error::Capacity attempts exhausted; rerun apply to continue"; exit 1; }
+make_plan
+if [[ "$OPERATION" == plan ]]; then exit 0; fi
+storage=$(jq -er '[.resource_changes[] | select(.address=="oci_core_volume.data" and .change.actions==["create"]) | .change.after.size_in_gbs | tonumber] | add // 0' "$work/plan.json")
+check_pilot_quota 0 0 "$storage"
+terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Completion failed; compute retained, rerun apply to resume"; grep -oE '[45][0-9]{2}-[A-Za-z][A-Za-z0-9_]+' "$work/apply.log" | sort -u || true; exit 1; }
 echo "Pilot infrastructure apply completed."
 terraform state list

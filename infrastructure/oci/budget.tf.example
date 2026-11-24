@@ -1,0 +1,31 @@
+# Separate budget bootstrap configuration. Do not add to application state.
+variable "tenancy_ocid" {
+  type = string
+}
+variable "alert_email" {
+  type = string
+}
+resource "oci_budget_budget" "pilot_guardrail" {
+  compartment_id = var.tenancy_ocid
+  target_type = "COMPARTMENT"
+  targets = [var.tenancy_ocid]
+  amount = 5
+  reset_period = "MONTHLY"
+  display_name = "90s6-pilot-cost-guardrail"
+  description = "Tenancy-wide early warning; not a spending cap"
+}
+resource "oci_budget_alert_rule" "actual" {
+  for_each = toset(["50", "80", "100"])
+  budget_id = oci_budget_budget.pilot_guardrail.id
+  type = "ACTUAL"
+  threshold = tonumber(each.value)
+  threshold_type = "PERCENTAGE"
+  recipients = var.alert_email
+}
+resource "oci_budget_alert_rule" "forecast" {
+  budget_id = oci_budget_budget.pilot_guardrail.id
+  type = "FORECAST"
+  threshold = 100
+  threshold_type = "PERCENTAGE"
+  recipients = var.alert_email
+}

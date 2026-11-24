@@ -129,6 +129,9 @@ read_winner() {
   if [[ -n "$winner" ]]; then
     oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" > "$work/ads.json"
     export TF_VAR_availability_domain_index=$(jq -er --arg ad "$winner" '[.data[].name] | index($ad) // error("Unknown AD")' "$work/ads.json")
+    export TF_VAR_pilot_ocpus=$(jq -er '.values.root_module.resources[] | select(.address=="oci_core_instance.pilot") | .values.shape_config[0].ocpus' "$work/current.json")
+    export TF_VAR_pilot_memory_gb=$(jq -er '.values.root_module.resources[] | select(.address=="oci_core_instance.pilot") | .values.shape_config[0].memory_in_gbs' "$work/current.json")
+    echo "Compute size locked: $TF_VAR_pilot_ocpus OCPUs, $TF_VAR_pilot_memory_gb GB"
     echo "Compute location locked: AD-$((TF_VAR_availability_domain_index+1))"
   fi
 }
@@ -138,10 +141,15 @@ if [[ -z "$winner" ]]; then
   if jq -e 'any(.values.root_module.resources[]?; .address=="oci_core_volume.data")' "$work/current.json" >/dev/null; then echo "::error::Existing volume requires review"; exit 1; fi
   for ((attempt=0; attempt<60; attempt++)); do
     export TF_VAR_availability_domain_index=$((attempt%3))
-    echo "Compute attempt $((attempt+1))/60, AD-$((TF_VAR_availability_domain_index+1))"
+    cores_by_tier=(2 2 1 1)
+    memory_by_tier=(12 8 8 6)
+    tier=$(((attempt/3)%4))
+    export TF_VAR_pilot_ocpus=${cores_by_tier[$tier]}
+    export TF_VAR_pilot_memory_gb=${memory_by_tier[$tier]}
+    echo "Compute attempt $((attempt+1))/60, AD-$((TF_VAR_availability_domain_index+1)), $TF_VAR_pilot_ocpus OCPUs, $TF_VAR_pilot_memory_gb GB"
     make_plan -target=oci_core_instance.pilot
     if [[ "$OPERATION" == plan ]]; then exit 0; fi
-    check_pilot_quota 2 12 50
+    check_pilot_quota "$TF_VAR_pilot_ocpus" "$TF_VAR_pilot_memory_gb" 50
     if terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1; then
       read_winner
       [[ -n "$winner" ]] || { echo "::error::Compute missing after apply"; exit 1; }

@@ -16,7 +16,7 @@ if [[ "$OPERATION" == budget ]]; then
   echo "Existing one dollar monthly Cost_Tracker verified. No budget changes made."
   exit 0
 fi
-if [[ "$OPERATION" == quota ]]; then
+check_pilot_quota() {
   ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query 'data[0].name' --raw-output 2>"$work/error")
   check_quota() {
     local service="$1" limit="$2" required="$3" scope="$4"
@@ -39,6 +39,9 @@ for m in re.finditer(r"\{",s):
   check_quota compute standard-a1-memory-count 12 ad
   check_quota block-storage total-storage-gb 150 ad
   echo "Requested quota checks passed. Physical host capacity and free-tier billing eligibility are not guaranteed."
+}
+if [[ "$OPERATION" == quota ]]; then
+  check_pilot_quota
   exit 0
 fi
 namespace=$(oci os ns get --query data --raw-output 2>"$work/error")
@@ -61,5 +64,9 @@ jq -r '.resource_changes[] | select(.mode == "managed") | [.address, (.change.ac
 if [[ "$OPERATION" == plan ]]; then exit 0; fi
 [[ "$OPERATION" == apply && "$CONFIRMATION" == CREATE-PILOT ]] || { echo "::error::Explicit apply confirmation required"; exit 1; }
 jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == ["create"] or .change.actions == ["no-op"])' "$work/plan.json" >/dev/null || { echo "::error::Only creates and no-ops allowed"; exit 1; }
-echo "::error::Apply intentionally blocked pending quota, budget and management access verification."
-exit 1
+if jq -e 'any(.resource_changes[]; .mode == "managed" and .address == "oci_core_instance.pilot" and .change.actions == ["create"])' "$work/plan.json" >/dev/null; then
+  check_pilot_quota
+fi
+terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."; exit 1; }
+echo "Pilot infrastructure apply completed."
+terraform state list

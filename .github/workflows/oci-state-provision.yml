@@ -7,6 +7,10 @@ on:
         type: choice
         options: [bootstrap, budget, quota, plan, apply, inspect-vcn, delete-vcn]
         default: plan
+      capacity_retry:
+        description: Retry host capacity failures up to 12 attempts
+        type: boolean
+        default: false
       confirmation:
         description: Enter CREATE-PILOT for apply or DELETE-VCN for deletion
         type: string
@@ -21,7 +25,7 @@ jobs:
     if: github.ref == 'refs/heads/feature/oci-deployment'
     runs-on: ubuntu-latest
     environment: oci-pilot
-    timeout-minutes: 60
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
         with:
@@ -44,5 +48,6 @@ jobs:
           TF_VAR_tenancy_ocid: ${{ secrets.OCI_TENANCY_OCID }}
           TF_VAR_region: ${{ vars.OCI_REGION }}
           OPERATION: ${{ inputs.operation }}
+          CAPACITY_RETRY: ${{ inputs.capacity_retry }}
           CONFIRMATION: ${{ inputs.confirmation }}
         run: bash state-workflow.sh

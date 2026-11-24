@@ -19,7 +19,7 @@ variable "tenancy_ocid" {
 }
 variable "availability_domain_index" {
   type = number
-  default = 1
+  default = 0
   validation {
     condition = contains([0, 1, 2], var.availability_domain_index)
     error_message = "Choose AD index 0, 1, or 2."
@@ -89,7 +89,7 @@ resource "oci_core_subnet" "pilot" {
 }
 resource "oci_core_volume" "data" {
   compartment_id = oci_identity_compartment.pilot.id
-  availability_domain = data.oci_identity_availability_domains.available.availability_domains[0].name
+  availability_domain = data.oci_identity_availability_domains.available.availability_domains[var.availability_domain_index].name
   display_name = "90s6-pilot-data"
   size_in_gbs = 100
   vpus_per_gb = 0

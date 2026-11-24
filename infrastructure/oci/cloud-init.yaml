@@ -1,0 +1,11 @@
+#cloud-config
+package_update: false
+ssh_pwauth: false
+disable_root: true
+write_files:
+  - path: /etc/90s6-pilot
+    permissions: '0644'
+    content: |
+      OCI pilot initialized.
+      Docker installation and data volume mounting are separate deployment steps.
+      Do not format an existing volume.

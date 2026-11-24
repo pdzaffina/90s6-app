@@ -35,9 +35,11 @@ for m in re.finditer(r"\{",s):
     jq -e --argjson required "$required" '(.data.available | type) == "number" and .data.available >= $required' "$work/quota.json" >/dev/null || { echo "::error::Insufficient available quota for $limit ($scope)"; return 1; }
     echo "$limit ($scope): sufficient available quota."
   }
-  check_quota compute standard-a1-core-count 2 ad
-  check_quota compute standard-a1-memory-count 12 ad
-  check_quota block-storage total-storage-gb 150 ad
+  local cores="${1:-2}" memory="${2:-12}" storage="${3:-150}"
+  echo "Additional quota required: $cores OCPUs, $memory GB RAM, $storage GB storage."
+  if (( cores > 0 )); then check_quota compute standard-a1-core-count "$cores" ad; fi
+  if (( memory > 0 )); then check_quota compute standard-a1-memory-count "$memory" ad; fi
+  if (( storage > 0 )); then check_quota block-storage total-storage-gb "$storage" ad; fi
   echo "Requested quota checks passed. Physical host capacity and free-tier billing eligibility are not guaranteed."
 }
 if [[ "$OPERATION" == quota ]]; then
@@ -66,9 +68,15 @@ jq -r '.resource_changes[] | select(.mode == "managed") | [.address, (.change.ac
 if [[ "$OPERATION" == plan ]]; then exit 0; fi
 [[ "$OPERATION" == apply && "$CONFIRMATION" == CREATE-PILOT ]] || { echo "::error::Explicit apply confirmation required"; exit 1; }
 jq -e 'all(.resource_changes[] | select(.mode == "managed"); .change.actions == ["create"] or .change.actions == ["no-op"])' "$work/plan.json" >/dev/null || { echo "::error::Only creates and no-ops allowed"; exit 1; }
-if jq -e 'any(.resource_changes[]; .mode == "managed" and .address == "oci_core_instance.pilot" and .change.actions == ["create"])' "$work/plan.json" >/dev/null; then
-  check_pilot_quota
-fi
+# Derive incremental demand from the exact saved plan, not the original target.
+read -r cores memory storage < <(jq -er '
+  [.resource_changes[] | select(.mode == "managed" and .change.actions == ["create"])] as $new |
+  ([$new[] | select(.address == "oci_core_instance.pilot") | .change.after.shape_config[0].ocpus] | add // 0) as $cores |
+  ([$new[] | select(.address == "oci_core_instance.pilot") | .change.after.shape_config[0].memory_in_gbs] | add // 0) as $memory |
+  ([$new[] | if .address == "oci_core_instance.pilot" then (.change.after.source_details[0].boot_volume_size_in_gbs | tonumber) elif .address == "oci_core_volume.data" then (.change.after.size_in_gbs | tonumber) else 0 end] | add // 0) as $storage |
+  [$cores,$memory,$storage] | @tsv' "$work/plan.json")
+[[ "$cores" =~ ^[0-9]+$ && "$memory" =~ ^[0-9]+$ && "$storage" =~ ^[0-9]+$ ]] || { echo "::error::Unable to determine incremental quota"; exit 1; }
+check_pilot_quota "$cores" "$memory" "$storage"
 terraform apply -input=false -lock-timeout=60s "$work/plan" > "$work/apply.log" 2>&1 || { echo "::error::Apply failed; remote state may contain partially created resources. Run plan before retrying."
 python3 - "$work/apply.log" <<'PY'
 import re,sys

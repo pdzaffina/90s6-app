@@ -11,32 +11,25 @@ export OCI_private_key_path="$work/key.pem"
 export OCI_tenancy_ocid="$OCI_TENANCY_OCID" OCI_user_ocid="$OCI_USER_OCID" OCI_fingerprint="$OCI_FINGERPRINT" OCI_region="$OCI_REGION"
 export TF_IN_AUTOMATION=true
 if [[ "$OPERATION" == budget ]]; then
-  : "${OCI_BUDGET_EMAIL:?Budget email secret required}"
-  name=pilot-90s6-cost-guardrail
-  oci budgets budget budget list --compartment-id "$OCI_TENANCY_OCID" --all > "$work/budgets.json" 2>"$work/error" || { echo "::error::Budget listing failed"; exit 1; }
-  id=$(jq -r --arg name "$name" '[.data[] | select((."display-name" == $name or ."display-name" == "90s6-pilot-cost-guardrail") and ."lifecycle-state" == "ACTIVE")] | if length > 1 then error("Duplicate budgets") else .[0].id // empty end' "$work/budgets.json")
-  if [[ -z "$id" ]]; then
-    targets=$(jq -cn --arg id "$OCI_TENANCY_OCID" '[$id]')
-    oci budgets budget budget create --compartment-id "$OCI_TENANCY_OCID" --amount 5 --reset-period MONTHLY --target-type COMPARTMENT --targets "$targets" --display-name "$name" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget creation failed"; python3 -c 'import json,re,sys; s=open(sys.argv[1]).read(); m=re.search(r"\{",s); d={};
-if m:
- try: d=json.loads(s[m.start():])
- except ValueError: pass
-for k in ("status","code"):
- v=str(d.get(k,"unknown")); print(k+": "+(v if re.fullmatch(r"[A-Za-z0-9_ -]{1,80}",v) else "redacted"))' "$work/error"; exit 1; }
-    id=$(jq -er '.data.id' "$work/budget.json")
-  fi
-  oci budgets budget budget get --budget-id "$id" > "$work/budget.json" 2>"$work/error" || { echo "::error::Budget lookup failed"; exit 1; }
-  jq -e '.data | .amount == 5 and ."reset-period" == "MONTHLY"' "$work/budget.json" >/dev/null || { echo "::error::Existing budget does not match requested settings"; exit 1; }
-  for spec in ACTUAL:50 ACTUAL:80 ACTUAL:100 FORECAST:100; do
-    type=${spec%:*}
-    threshold=${spec#*:}
-    oci budgets budget alert-rule list --budget-id "$id" --all > "$work/rules.json" 2>"$work/error" || { echo "::error::Budget alert listing failed"; exit 1; }
-    if ! jq -e --arg type "$type" --argjson threshold "$threshold" --arg email "$OCI_BUDGET_EMAIL" 'any(.data[]; .type == $type and .threshold == $threshold and ."threshold-type" == "PERCENTAGE" and .recipients == $email)' "$work/rules.json" >/dev/null; then
-      oci budgets budget alert-rule create --budget-id "$id" --type "$type" --threshold "$threshold" --threshold-type PERCENTAGE --recipients "$OCI_BUDGET_EMAIL" > "$work/rule.json" 2>"$work/error" || { echo "::error::Budget alert creation failed"; exit 1; }
-    fi
-    echo "Verified or created $type alert at $threshold percent."
-  done
-  echo "Five dollar monthly budget configured."
+  oci budgets budget budget list --compartment-id "$OCI_TENANCY_OCID" --all > "$work/budgets.json" 2>"$work/error" || { echo "::error::Budget lookup failed"; exit 1; }
+  jq -e --arg root "$OCI_TENANCY_OCID" 'any(.data[]; ."display-name" == "Cost_Tracker" and ."lifecycle-state" == "ACTIVE" and .amount == 1 and ."reset-period" == "MONTHLY" and ((.targets // []) | index($root) != null))' "$work/budgets.json" >/dev/null || { echo "::error::Existing budget could not be verified"; exit 1; }
+  echo "Existing one dollar monthly Cost_Tracker verified. No budget changes made."
+  exit 0
+fi
+if [[ "$OPERATION" == quota ]]; then
+  ad=$(oci iam availability-domain list --compartment-id "$OCI_TENANCY_OCID" --query 'data[0].name' --raw-output 2>"$work/error")
+  check_quota() {
+    local service="$1" limit="$2" required="$3" scope="$4"
+    local args=()
+    if [[ "$scope" == ad ]]; then args+=(--availability-domain "$ad"); fi
+    oci limits resource-availability get --compartment-id "$OCI_TENANCY_OCID" --service-name "$service" --limit-name "$limit" "${args[@]}" > "$work/quota.json" 2>"$work/error" || { echo "::error::Unable to verify $limit ($scope)"; return 1; }
+    jq -e --argjson required "$required" '.data.available >= $required' "$work/quota.json" >/dev/null || { echo "::error::Insufficient available quota for $limit ($scope)"; return 1; }
+    echo "$limit ($scope): sufficient available quota."
+  }
+  check_quota compute standard-a1-core-count 2 region
+  check_quota compute standard-a1-memory-count 12 region
+  check_quota block-storage total-storage-gb 150 ad
+  echo "Requested quota checks passed. Physical host capacity and free-tier billing eligibility are not guaranteed."
   exit 0
 fi
 namespace=$(oci os ns get --query data --raw-output 2>"$work/error")

@@ -59,7 +59,7 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 .ap-password-form .ap-input{flex:1;min-width:180px}
 .ap-password-form .ap-msg{flex-basis:100%;margin:0}
 .ap-footer{display:flex;justify-content:space-between;gap:12px;margin-top:36px;padding-top:16px;border-top:1px solid var(--ap-line);color:#8390a0;font-size:9px}
-.ap-input{padding:10px 12px;border:1px solid #cbd5df;border-radius:6px;font:inherit;min-width:220px;background:#fff}
+.ap-input{padding:10px 12px;border:1px solid #cbd5df;border-radius:6px;font:inherit;min-width:min(220px,100%);max-width:100%;box-sizing:border-box;background:#fff}
 .ap-btn{padding:9px 14px;border:1px solid #cbd5df;border-radius:6px;background:#fff;color:var(--ap-midnight);font:inherit;font-weight:650;cursor:pointer}
 .ap-btn.primary{background:var(--ap-blue);border-color:var(--ap-blue);color:#fff}
 .ap-btn.danger{color:#a43131;border-color:#e3b9b9}
@@ -166,7 +166,11 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
   main :is(.ap-row,.toolbar,form) > select:not([multiple]){flex:1 1 100%}
   main :is(.ap-row,.toolbar,form) > label:has(select){flex:1 1 100%;min-width:0;max-width:100%}
   main label:has(select){min-width:0;max-width:100%}
-  main .ap-input{min-width:0;max-width:100%}
+  main .ap-input{min-width:0!important;max-width:100%!important;box-sizing:border-box}
+  main :is(.ap-panel,.ap-card) :is(select,input:not([type=checkbox]):not([type=radio]),textarea){min-width:0!important;max-width:100%!important;box-sizing:border-box}
+  main :is(.ap-row,form,.toolbar)>*{min-width:0;max-width:100%}
+  main label:has(>input[type=checkbox]){display:inline-flex;align-items:flex-start;gap:8px;overflow-wrap:anywhere}
+  main label>input[type=checkbox]{flex:none;margin-top:.25em}
   #appNav .ap-nav-account,#appNav .ap-org-control{min-width:0}
   #appNav #apTenantSelect{min-width:0;max-width:100%;width:auto;text-overflow:ellipsis}
   #appNav .ap-org-control{flex-shrink:1}

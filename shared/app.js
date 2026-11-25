@@ -83,9 +83,50 @@
     </div>
     <div class="ap-nav-bottom"><nav aria-label="Main navigation"><a href="/">Home</a><a href="/action-inbox/">Action Inbox</a><a href="/portfolio-management/">Portfolio Management</a><a href="/work-board/">Work Board</a><a href="/crm/">Relationships</a><a href="/training/">Training</a><a href="/prompts/">Prompt Library</a><a href="/knowledge-base/">Knowledge Base</a><a href="/content-studio/" id="apStudioLink" hidden>Content Studio</a><a href="/tenant-admin/" id="apTenantAdminLink" hidden>Organization Admin</a><a href="/admin/" id="apAdminLink" hidden>Global Admin</a></nav></div>`;
   document.body.prepend(nav);
-  nav.querySelectorAll('nav a').forEach(a => {
-    if (location.pathname.startsWith(a.getAttribute('href'))) a.setAttribute('aria-current', 'page');
-  });
+
+  // Unified navigation: preserve existing links and delegate local section actions to their original controls.
+  const style=document.createElement('style');style.textContent="\nbody.ap-unified{padding-left:var(--ap-sidebar-width,220px)}\nbody.ap-unified.ap-collapsed{--ap-sidebar-width:58px}\n#appNav .ap-nav-top{padding:9px 18px}\n#appNav .ap-nav-bottom{position:fixed;top:64px;bottom:0;left:0;width:var(--ap-sidebar-width,220px);background:var(--ap-midnight);padding:12px 8px;overflow:auto;border:0;display:flex;flex-direction:column}\n#appNav .ap-nav-bottom nav{display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;gap:3px;overflow:visible;flex:1}\n#appNav nav .ap-group-label{font-size:10px;letter-spacing:1px;color:#a9bdd2;padding:15px 10px 5px}\n#appNav nav a,#appNav nav button{margin:0!important;color:#d5e0ec;text-align:left;white-space:normal;padding:9px 10px;border:0;display:flex;align-items:center;gap:9px;font-weight:600}\n#appNav nav a:hover,#appNav nav button:hover,#appNav nav [aria-current]{background:#ffffff20;color:white}\n#appNav nav .ap-parent{display:flex;align-items:center}\n#appNav nav .ap-parent a{flex:1;min-width:0}\n#appNav nav .ap-sub{padding-left:13px;margin-left:14px;border-left:1px solid #ffffff35}\n#appNav nav .ap-sub button{width:100%;font-size:12px;font-weight:500}\n#appNav .ap-nav-icon{width:19px;flex:none;text-align:center;font-size:17px}\n#appNav .ap-nav-toggle{margin-top:12px;text-align:left}\n#appNav .ap-mobile-toggle{display:none}\nbody.ap-collapsed #appNav .ap-nav-label,body.ap-collapsed #appNav .ap-group-label,body.ap-collapsed #appNav .ap-sub,body.ap-collapsed #appNav .ap-expand{display:none!important}\nbody.ap-unified .admin-workspace,body.ap-unified .crm-layout{grid-template-columns:minmax(0,1fr)}\nbody.ap-unified .ap-local-mirrored{display:none!important}\n@media(max-width:760px){body.ap-unified{padding-left:0}#appNav .ap-mobile-toggle{display:block}#appNav .ap-nav-bottom{display:none;width:min(280px,85vw);box-shadow:8px 0 25px #0004}body.ap-drawer #appNav .ap-nav-bottom{display:flex}#appNav .ap-nav-toggle{display:none}}\n";document.head.append(style);
+  const sidebar=nav.querySelector('.ap-nav-bottom'), menu=sidebar.querySelector('nav');
+  const groups=[['Workspace',[['/','⌂'],['/action-inbox/','◎'],['/work-board/','▤'],['/portfolio-management/','◫'],['/crm/','♧']]],['Resources',[['/knowledge-base/','▧'],['/prompts/','✧'],['/training/','▷'],['/content-studio/','✎']]],['Administration',[['/tenant-admin/','⚙'],['/admin/','◈']]]];
+  const links=new Map(Array.from(menu.querySelectorAll('a')).map(a=>[a.getAttribute('href'),a]));
+  let activeRow=null, activeSub=null, activeExpand=null;
+  menu.replaceChildren();
+  for(const [title,entries] of groups){
+    const heading=el('div',{className:'ap-group-label',textContent:title});menu.append(heading);
+    for(const [href,symbol] of entries){
+      const a=links.get(href);if(!a)continue;
+      const label=a.textContent;a.replaceChildren(el('span',{className:'ap-nav-icon',textContent:symbol}),el('span',{className:'ap-nav-label',textContent:label}));a.title=label;a.setAttribute('aria-label',label);
+      const row=el('div',{className:'ap-parent'},a);menu.append(row);
+      if(href==='/'?location.pathname==='/':location.pathname.startsWith(href)){
+        a.setAttribute('aria-current','page');activeRow=row;
+        activeSub=el('div',{className:'ap-sub',hidden:true});activeExpand=el('button',{className:'ap-expand',type:'button',textContent:'⌄',hidden:true});activeExpand.setAttribute('aria-label','Toggle application sections');activeExpand.setAttribute('aria-expanded','true');
+        activeExpand.addEventListener('click',()=>{activeSub.hidden=!activeSub.hidden;activeExpand.setAttribute('aria-expanded',String(!activeSub.hidden))});row.append(activeExpand);menu.append(activeSub);
+      }
+    }
+  }
+  const toggle=el('button',{className:'ap-nav-toggle',type:'button',textContent:'‹ Collapse'});sidebar.append(toggle);
+  const mobile=el('button',{className:'ap-mobile-toggle',type:'button',textContent:'☰'});mobile.setAttribute('aria-label','Open navigation');mobile.setAttribute('aria-expanded','false');nav.querySelector('.ap-nav-top').prepend(mobile);
+  function collapse(on){document.body.classList.toggle('ap-collapsed',on);toggle.textContent=on?'›':'‹ Collapse';toggle.setAttribute('aria-label',on?'Expand sidebar':'Collapse sidebar');try{localStorage.setItem('90s6-nav-collapsed',String(on))}catch(e){}}
+  toggle.addEventListener('click',()=>collapse(!document.body.classList.contains('ap-collapsed')));
+  mobile.addEventListener('click',()=>{collapse(false);const open=document.body.classList.toggle('ap-drawer');mobile.setAttribute('aria-expanded',String(open))});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('ap-drawer');mobile.setAttribute('aria-expanded','false')}});
+  function syncSections(){
+    if(!activeSub)return;
+    const source=document.querySelector('.admin-nav,#crmNav,#tabs,.ainbox-tabs');
+    if(!source)return;
+    const controls=Array.from(source.querySelectorAll('button,a')).filter(b=>!b.hidden&&!b.disabled&&b.textContent.trim());
+    if(!controls.length)return;
+    const signature=JSON.stringify(controls.map(b=>[b.textContent.trim(),b.getAttribute('aria-current'),b.getAttribute('aria-selected'),b.className]));
+    if(activeSub.dataset.signature===signature)return;
+    activeSub.dataset.signature=signature;activeSub.replaceChildren();
+    controls.forEach(b=>{const item=el('button',{type:'button',textContent:b.textContent.trim()});if(b.hasAttribute('aria-current')||b.getAttribute('aria-selected')==='true'||b.classList.contains('active'))item.setAttribute('aria-current','page');item.addEventListener('click',()=>{b.click();document.body.classList.remove('ap-drawer');mobile.setAttribute('aria-expanded','false');syncSections()});activeSub.append(item)});
+    if(activeExpand.hidden){activeExpand.hidden=false;activeSub.hidden=false}
+    (source.closest('.admin-sidebar')||source).classList.add('ap-local-mirrored');
+  }
+  const observer=new MutationObserver(records=>{if(records.some(r=>!nav.contains(r.target)))syncSections()});
+  observer.observe(document.body,{subtree:true,childList:true,attributes:true,attributeFilter:['hidden','class','aria-current','aria-selected']});
+  try{collapse(localStorage.getItem('90s6-nav-collapsed')==='true')}catch(e){}
+
   $('apOut').addEventListener('click', () => signOut());
   $('apUserButton').addEventListener('click', () => { const menu=$('apUserDropdown');menu.hidden=!menu.hidden;$('apUserButton').setAttribute('aria-expanded',String(!menu.hidden)); });
   document.addEventListener('click', e => { if (!e.target.closest('#appNav .ap-user-menu')) { $('apUserDropdown').hidden=true;$('apUserButton').setAttribute('aria-expanded','false'); } });
@@ -94,6 +135,7 @@
 
   function renderNav() {
     nav.hidden = state !== 'in';
+    document.body.classList.toggle('ap-unified',state==='in');
     if (state !== 'in') return;
     $('apAdminLink').hidden = !profile.is_admin;
     $('apTenantAdminLink').hidden = !isTenantAdmin(); // Tenant Admin UI pending authorization-aware implementation.
@@ -108,6 +150,8 @@
     $('apOrgChevron').hidden=!multipleOrgs;
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
     [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base'],['/action-inbox/','action_inbox'],['/crm/','crm']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
+    for(const a of links.values())a.parentElement.hidden=a.hidden;
+    syncSections();
     $('apWho').textContent = profile.full_name || profile.email || '';
     $('apAvatar').textContent=(profile.full_name || profile.email || 'U').split(/[\\s@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('');
   }

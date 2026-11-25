@@ -156,3 +156,20 @@ body.ap-body{margin:0;background:var(--ap-cloud);color:var(--ap-ink);font:15px/1
 .ap-org-ai-swatches{display:flex;flex-wrap:wrap;gap:18px;margin:12px 0}
 .ap-org-ai-swatches>div{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:650}
 .ap-org-ai-swatch{width:36px;height:36px;display:inline-block;border-radius:8px;border:1px solid #94a3b855}
+
+
+/* Mobile form containment: native selects must not size cards to their longest option. */
+@media(max-width:760px){
+  body.ap-unified main,body.ap-body main{min-width:0;max-width:100%;box-sizing:border-box}
+  main :is(.ap-panel,.ap-card,.ap-row,.toolbar,form,fieldset,label){min-width:0;max-width:100%;box-sizing:border-box}
+  main select:not([multiple]){box-sizing:border-box;min-width:0!important;max-width:100%!important;width:100%;text-overflow:ellipsis;font-size:16px}
+  main :is(.ap-row,.toolbar,form) > select:not([multiple]){flex:1 1 100%}
+  main :is(.ap-row,.toolbar,form) > label:has(select){flex:1 1 100%;min-width:0;max-width:100%}
+  main label:has(select){min-width:0;max-width:100%}
+  main .ap-input{min-width:0;max-width:100%}
+  #appNav .ap-nav-account,#appNav .ap-org-control{min-width:0}
+  #appNav #apTenantSelect{min-width:0;max-width:100%;width:auto;text-overflow:ellipsis}
+  #appNav .ap-org-control{flex-shrink:1}
+  #appNav .ap-nav-top{gap:8px}
+  #appNav .ap-user-menu{flex:none}
+}

@@ -29,3 +29,6 @@ Logical entities: sentinel_categories, sentinel_watches, sentinel_sources, senti
 
 ## Delivery
 Foundation, import, collection, AI, scheduling, dashboard and integrations. Search provider credentials are deployment prerequisites; no fabricated live results. Feature branch until verified.
+
+## Search provider decision (2026-11-26)
+GDELT DOC API is the default keyless news discovery provider. Brave is optional and selected only through SENTINEL_SEARCH_PROVIDER=brave plus its secret. GDELT returns indexed article metadata, not full text. Default lookback is seven days; requests are paced. RSS and governed Nemotron tool calling are follow-on work. Do not treat empty coverage as proof of no risk.

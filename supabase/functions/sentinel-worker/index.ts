@@ -27,7 +27,31 @@ Deno.serve(async req=>{
  try{evidence=await rss();}catch(primary){try{evidence=await gdelt();}catch(secondary){throw Error(String(primary)+'; fallback: '+String(secondary));}}
 
  }catch(e){status='failed';error=e instanceof Error?e.message:'Search failed'}
- const saved=await db.from('sentinel_scan_runs').update({status,error,evidence,finished_at:new Date().toISOString()}).eq('id',job.id).eq('status','running');
+ let assessment:string|null=null;
+ if(status==='complete'&&evidence.length){
+ let usage:string|null=null, input=0,output=0,cost=0,billed=false;
+ try{
+ const apiKey=Deno.env.get('AINBOX_LLM_API_KEY'),base=(Deno.env.get('AINBOX_LLM_BASE_URL')||'https://integrate.api.nvidia.com/v1').replace(/\/+$/,'');
+ if(!apiKey||!base.startsWith('https://'))throw Error('AI provider unavailable');
+ const reservation=await db.rpc('sentinel_ai_begin',{p_run:job.id,p_evidence:evidence.map((a:any,i)=>({...a,source_number:i+1}))});
+ if(reservation.error)throw Error(reservation.error.message);
+ const cfg=reservation.data;
+ if(cfg){
+ usage=cfg.usage_id;
+ const response=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(cfg.payload),signal:AbortSignal.timeout(Math.min(120000,Math.max(5000,Number(cfg.timeout_ms)||20000)))});
+ const data=await response.json();
+ input=Number(data?.usage?.prompt_tokens)||0;output=Number(data?.usage?.completion_tokens)||0;cost=(input*Number(cfg.input_rate)+output*Number(cfg.output_rate))/1000000;billed=response.ok;
+ const audit=await db.from('ainbox_ai_request_audit').update({response_payload:data,response_at:new Date().toISOString(),http_status:response.status,provider_request_id:response.headers.get('x-request-id'),input_tokens:input,output_tokens:output,estimated_usd:cost,error_message:response.ok?null:'Provider HTTP '+response.status}).eq('usage_id',usage);
+ if(audit.error)throw Error('AI response audit failed');
+ if(!response.ok)throw Error('AI provider HTTP '+response.status);
+ const raw=data?.choices?.[0]?.message?.content;
+ if(typeof raw!=='string'||!raw.trim())throw Error('AI returned no visible assessment; check model and token budget');
+ assessment=raw.trim().slice(0,16000);
+ }
+ }catch(e){status='partial';error='Assessment unavailable: '+(e instanceof Error?e.message:'AI request failed');if(usage)await db.from('ainbox_ai_request_audit').update({error_message:error,response_at:new Date().toISOString()}).eq('usage_id',usage);}
+ finally{if(usage){const finish=await db.from('ainbox_ai_usage').update({status:billed?'completed':'failed',reserved_usd:0,input_tokens:input,output_tokens:output,estimated_usd:cost}).eq('id',usage).eq('status','reserved');if(finish.error){assessment=null;status='partial';error='AI usage finalization failed';}}}
+ }
+ const saved=await db.from('sentinel_scan_runs').update({status,error,evidence,assessment,finished_at:new Date().toISOString()}).eq('id',job.id).eq('status','running');
  if(saved.error)return reply({error:'Save failed'},500);
  return reply({status,count:evidence.length});
 });

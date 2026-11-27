@@ -446,7 +446,23 @@ async function showNotifications(){
   }
  }catch{panel.replaceChildren(el('p','Notifications could not load.'),button('Refresh',render))}
 }
-function render(){nav.replaceChildren();for(const p of ['Overview','Watchlist','Intelligence','Assessments','Notifications','Scan history']){const b=button(p,()=>{page=p;const u=new URL(location.href);u.searchParams.set('section',p.toLowerCase().replace(/ /g,'-'));u.searchParams.delete('assessment');u.searchParams.delete('watch');history.replaceState(history.state,'',u);render()});b.className='';if(p===page)b.setAttribute('aria-current','page');nav.append(b)}view.replaceChildren();view.append(el('h2',page));if(page==='Overview'){view.append(dashboard());return}if(page==='Notifications'){void showNotifications();return}if(page!=='Watchlist'){view.append(actions(button('Refresh',load)));const params=new URLSearchParams(location.search),assessmentId=page==='Assessments'?params.get('assessment'):null,watchId=params.get('watch');
+async function showDevelopments(){
+ const panel=card(),scope=org;
+ panel.append(el('h3','Persistent developments'),el('p','Related headlines are grouped within each watch. Matching headlines do not establish independent corroboration.'));
+ view.append(panel);
+ const result=await sb.rpc('sentinel_developments',{p_org:scope,p_watch:new URLSearchParams(location.search).get('watch')||null});
+ if(org!==scope||!panel.isConnected)return;
+ if(result.error){panel.append(el('p','Developments unavailable: '+result.error.message));return}
+ if(!result.data.length)panel.append(el('p','No indexed developments yet.'));
+ for(const d of result.data){
+  const item=el('details');item.append(el('summary',d.title),el('p', (watches.find(w=>w.id===d.watch_id)?.name||'Watch')+' · '+d.evidence_count+' evidence items · First observed '+new Date(d.first_seen_at).toLocaleDateString()+' · Latest new evidence '+new Date(d.last_seen_at).toLocaleDateString()));
+  const list=el('ul');
+  for(const e of d.evidence||[]){const li=el('li');try{const u=new URL(e.url);if(!['http:','https:'].includes(u.protocol))throw Error();const a=el('a',e.title||u.hostname);a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a)}catch{li.append(el('span',e.title||'Evidence'))}li.append(el('span',' · '+(e.source||'Unknown source')));list.append(li)}
+  item.append(list);panel.append(item);
+ }
+ if(result.data.length===100)panel.append(el('p','Showing the 100 most recently indexed developments.'));
+}
+function render(){nav.replaceChildren();for(const p of ['Overview','Watchlist','Intelligence','Assessments','Notifications','Scan history']){const b=button(p,()=>{page=p;const u=new URL(location.href);u.searchParams.set('section',p.toLowerCase().replace(/ /g,'-'));u.searchParams.delete('assessment');u.searchParams.delete('watch');history.replaceState(history.state,'',u);render()});b.className='';if(p===page)b.setAttribute('aria-current','page');nav.append(b)}view.replaceChildren();view.append(el('h2',page));if(page==='Overview'){view.append(dashboard());return}if(page==='Notifications'){void showNotifications();return}if(page==='Intelligence'){void showDevelopments().catch(e=>status(e.message));}if(page!=='Watchlist'){view.append(actions(button('Refresh',load)));const params=new URLSearchParams(location.search),assessmentId=page==='Assessments'?params.get('assessment'):null,watchId=params.get('watch');
  const selected=runs.filter(r=>(!watchId||r.watch_id===watchId)&&(assessmentId?r.id===assessmentId:page==='Scan history'||(page==='Intelligence'?r.evidence?.length:r.assessment||r.evidence?.length||['queued','running'].includes(r.status))));if(!selected.length)view.append(el('p',assessmentId?'This assessment could not be found or is unavailable.':'No assessments yet. Run a scan from Watchlist.'));for(const r of selected)view.append(assessment(r));return}view.append(actions(button('Add watch',()=>form()),button('Bulk import',importer),button('Edit selected',bulkEdit),button('Refresh',load)));for(const w of watches){const c=card();c.append(el('h3',w.name),el('p',[w.category,w.ticker,w.frequency,w.active?'Active':'Disabled'].filter(Boolean).join(' · ')));if(w.owner_id===user){
  const selection=el('input');selection.type='checkbox';selection.checked=selectedWatches.has(w.id);
  selection.onchange=()=>{if(selection.checked)selectedWatches.add(w.id);else selectedWatches.delete(w.id)};

@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import { isTransientStatus, MAX_ATTEMPTS, retryAfterSeconds, retryDelay } from './retry.mjs';
 
-import { allowedFeedUrl, edgarEvidence, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
+import { allowedFeedUrl, describeEvidence, edgarEvidence, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
 
 async function boundedBody(response:Response, maxBytes=1_000_000){
  const reader=response.body?.getReader();
@@ -203,7 +203,7 @@ Deno.serve(async req=>{
  };
  const checkpoint=async ()=>{
   const saved=await db.rpc('sentinel_checkpoint_evidence',{
-   p_run:job.id,p_started_at:job.started_at,p_evidence:evidence.slice(0,45),p_error:error
+   p_run:job.id,p_started_at:job.started_at,p_evidence:describeEvidence(evidence.slice(0,45),job.name,context),p_error:error
   });
   if(saved.error)return await save({evidence,status:'partial',error:'Evidence indexing is unavailable.',finished_at:new Date().toISOString()})
    ?? reply({status:'partial',count:evidence.length});

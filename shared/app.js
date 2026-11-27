@@ -20,6 +20,13 @@
   function setActiveTenant(id) {
     if (!tenantMemberships.some(m => m.tenant_id === id)) throw new Error('Not a member of this tenant');
     activeTenantId = id;
+    if (location.pathname.startsWith('/news-watch/')) {
+      const url = new URL(location.href);
+      url.searchParams.delete('org');
+      url.searchParams.delete('assessment');
+      url.searchParams.delete('watch');
+      history.replaceState(history.state,'',url);
+    }
     sessionStorage.setItem('90s6-active-tenant:' + profile.id, id);
     location.reload();
   }
@@ -188,7 +195,9 @@
     if (memberships.error) { notice='Could not load organization membership.'; session=null; await sb.auth.signOut(); return; }
     tenantMemberships = memberships.data || [];
     const preferred = sessionStorage.getItem('90s6-active-tenant:' + s.user.id);
-    activeTenantId = tenantMemberships.some(m => m.tenant_id === preferred) ? preferred : tenantMemberships[0]?.tenant_id || null;
+    const linkedOrg = location.pathname.startsWith('/news-watch/') ? new URLSearchParams(location.search).get('org') : null;
+    const selectedOrg = tenantMemberships.some(m => m.tenant_id === linkedOrg) ? linkedOrg : preferred;
+    activeTenantId = tenantMemberships.some(m => m.tenant_id === selectedOrg) ? selectedOrg : tenantMemberships[0]?.tenant_id || null;
     if (!activeTenantId && !profile.is_admin) { notice='No active organization membership. Contact your administrator.'; session=null; await sb.auth.signOut(); return; }
     const grants=await sb.from('user_feature_access').select('feature,enabled').eq('user_id',s.user.id); if(grants.error){notice='Could not load application permissions.';session=null;await sb.auth.signOut();return;}features={};(grants.data||[]).forEach(x=>features[x.feature]=x.enabled);
     organizationFeatures={};tenantUserFeatures={};

@@ -5,6 +5,7 @@
     const url = new URL('/news-watch/', location.origin);
     url.searchParams.set('section', 'assessments');
     url.searchParams.set('assessment', id);
+    if (App.activeTenantId) url.searchParams.set('org', App.activeTenantId);
     return url;
   }
 

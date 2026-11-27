@@ -106,7 +106,8 @@ export function parseFeed(xml, feedUrl) {
 export function watchQuery(name, context) {
   const terms = value => String(value ?? '').split(',').map(term => term
     .replace(/[^\p{L}\p{N}\s.-]/gu,' ').trim().slice(0,42)).filter(Boolean).slice(0,3);
-  const names = terms(name).slice(0,1).concat(terms(context.alternative_names));
+  const aliases = terms(context.alternative_names);
+  const names = terms(name).slice(0,1).concat(aliases,terms(context.subsidiaries).slice(0,Math.max(0,3-aliases.length)));
   if (!names.length) throw new Error('Empty query');
   const quoted = values => values.map(value => '"'+value+'"');
   const alternatives = quoted(names);
@@ -143,4 +144,21 @@ export function edgarEvidence(cik, data, earliest) {
     if (items.length >= 15) break;
   }
   return normalizeEvidence(items, 'sec-edgar', 'regulatory');
+}
+
+export function describeEvidence(items, watchName, context) {
+  const compact = value=>String(value||'').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+  const topics = [watchName,...String(context.alternative_names||'').split(','),
+    ...String(context.subsidiaries||'').split(','),...String(context.products||'').split(','),
+    context.industry,context.geography].map(compact).filter(value=>value.length>2);
+  return items.map(item=>{
+    const suffix=' - '+item.source;
+    const title=item.title.toLowerCase().endsWith(suffix.toLowerCase())?item.title.slice(0,-suffix.length):item.title;
+    const storyKey=compact(title).slice(0,180);
+    const titleText=' '+storyKey+' ';
+    const score=topics.filter(topic=>titleText.includes(' '+topic+' ')).length;
+    const regulatory=item.source_classification==='regulatory';
+    const label=regulatory?'primary':'secondary';
+    return {...item,story_key:storyKey,source_role:label,relevance:regulatory?'issuer filing':score?'matched watch context':'search result'};
+  });
 }

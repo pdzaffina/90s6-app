@@ -5,10 +5,14 @@ on:
     paths:
       - 'scripts/sentinel-worker*'
       - 'scripts/sentinel-*.test.mjs'
+      - 'scripts/sentinel-ui.browser.mjs'
       - 'supabase/functions/sentinel-worker/**'
       - 'supabase/migrations/*sentinel*'
       - 'news-watch/**'
       - 'admin/sentinel-operations.js'
+      - 'shared/sentinel-links.js'
+      - 'shared/app.js'
+      - '.github/workflows/sentinel.yml'
 permissions:
   contents: read
 jobs:
@@ -22,3 +26,9 @@ jobs:
       - run: node --test scripts/sentinel-*.test.mjs
       - run: node --check news-watch/news-watch.js
       - run: node --check admin/sentinel-operations.js
+
+      - name: Check desktop and mobile rendering
+        run: |
+          npm install --no-save --no-package-lock playwright@1.62.1 @sparticuz/chromium@158.0.0
+          export CHROMIUM_PATH="$(node --input-type=module -e "import chromium from '@sparticuz/chromium'; console.log(await chromium.executablePath())")"
+          node scripts/sentinel-ui.browser.mjs

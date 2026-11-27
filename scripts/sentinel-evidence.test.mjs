@@ -49,3 +49,15 @@ test('SEC EDGAR fixtures yield primary filing links and exclude old entries', as
   assert.equal(items[0].source_classification, 'regulatory');
   assert.equal(items[0].url, 'https://www.sec.gov/Archives/edgar/data/123/000000012326000001/report.htm');
 });
+
+test('matching syndicated titles keep separate attribution and one story key', async () => {
+  const {describeEvidence} = await import('../supabase/functions/sentinel-worker/evidence.mjs');
+  const variants = normalizeEvidence([
+    {url:'https://first.example/story',title:'Acme expands facility - First',source:'First'},
+    {url:'https://second.example/story',title:'Acme expands facility - Second',source:'Second'},
+  ],'google-news-rss','other');
+  const rows = describeEvidence(variants,'Acme',{});
+  assert.equal(rows[0].story_key,rows[1].story_key);
+  assert.notEqual(rows[0].source,rows[1].source);
+  assert.equal(rows[0].relevance,'matched watch context');
+});

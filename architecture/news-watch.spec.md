@@ -143,3 +143,8 @@ Turn on “Send significant findings to Action Inbox” on a watch whose owner h
 ### Administrator source lists
 
 Global Admin and Organization Admin each have a Sentinel sources section. Enter up to eight website URLs or domains per scope, separated by commas or new lines. The editor saves domains. A scan searches the union of the global list and its organization's list for the current watch using Google News. Matched results are prioritized for assessment. Coverage depends on what Google News indexes. The worker sends the configured domains as search filters and does not fetch user-entered URLs directly.
+
+
+### Phase 11: Persistent development baseline
+
+Migration `20261127_17_sentinel_developments.sql` adds private development and evidence-link tables, a normalized headline correlation trigger, historical backfill, and a restricted authenticated read RPC. Correlation is watch- and organization-scoped. Matching normalized headlines are candidates for the same story, not proof of independent corroboration. The Intelligence page displays up to 100 developments and 30 evidence links per development alongside existing scan reports. Observation dates describe newly indexed evidence, not repeat retrievals. Production verification found 27 indexed evidence rows, 26 developments and 27 links; anonymous RPC execution is denied. Differently worded stories, contradiction detection, independent corroboration, category and materiality classification, lifecycle history and signed-in browser acceptance remain outstanding. Rollback: revert the UI, disable the correlation trigger in a forward migration, and retain the additive tables and historical links.

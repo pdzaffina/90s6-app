@@ -47,7 +47,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
 | 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Collection and assessment stages and Global Admin operations panel added. Investigation stage and scheduled and cross-tenant end-to-end tests pending. |
 | 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. SEC EDGAR adapter and CIK watch field added. Production preferred-feed and SEC verification, expanded entity context, source verification, and syndicated-content grouping pending. |
-| 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Independent AI features, bounded follow-up, model and mobile verification pending. |
+| 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Bounded deep planning and follow-up share the existing AI budget and audit. Independent risk-classification and briefing features and deep mobile verification pending. |
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
 | 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
 | 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
@@ -99,3 +99,11 @@ News Watch → Notifications shows in-app alerts and digests scoped to the signe
 Overview uses the latest structured assessment per watch in the selected period for risk and trend views. It shows coverage, freshness, collection health, developments, and advisory actions. The browser uses the 200 most recent accessible scan records and identifies that limit when reached. Signed-in users switch organizations with the existing organization selector.
 
 To stop digest generation, unschedule `sentinel-digests`. To stop new in-app alerts, disable the `sentinel_publish_alert` trigger in a forward migration. Retain generated notification history and RLS. Roll back the UI through GitHub Pages independently.
+
+### Deep investigation
+
+An authorized watch owner can start a deep investigation when both Investigation Planning and Intelligence Assessment are enabled. Follow-up Investigation independently controls the second model round. Each request uses the selected component model, a bounded deadline and token budget, the shared usage budget, and existing request and response auditing. A standard scan collects and assesses without the additional planning requests.
+
+Watch settings bound deep investigation to one or two rounds, one to three search requests, and a minimum model-estimated relevance threshold. Search proposals must be short topics. The worker combines each with the watch query and submits it only to the built-in Google News search endpoint. Evidence from initial collection remains indexed if follow-up searches time out. The final report cites evidence from the combined set. The worker uses deterministic query orchestration and does not depend on native tool-calling support.
+
+To disable deep work, turn off Sentinel Investigation Planning in Global AI Admin. Standard scans and existing reports remain available. A worker rollback may preserve the additional columns and settings.

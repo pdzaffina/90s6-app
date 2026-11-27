@@ -89,10 +89,12 @@
   const sidebar=nav.querySelector('.ap-nav-bottom'), menu=sidebar.querySelector('nav');
   const groups=[['Workspace',[['/','⌂'],['/action-inbox/','◎'],['/work-board/','▤'],['/portfolio-management/','◫'],['/crm/','♧'],['/news-watch/','◎']]],['Resources',[['/knowledge-base/','▧'],['/prompts/','✧'],['/training/','▷'],['/content-studio/','✎']]],['Administration',[['/tenant-admin/','⚙'],['/admin/','◈']]]];
   const links=new Map(Array.from(menu.querySelectorAll('a')).map(a=>[a.getAttribute('href'),a]));
+  const groupHeadings=[];
   let activeRow=null, activeSub=null, activeExpand=null;
   menu.replaceChildren();
   for(const [title,entries] of groups){
-    const heading=el('div',{className:'ap-group-label',textContent:title});menu.append(heading);
+    const heading=el('div',{className:'ap-group-label',textContent:title,hidden:true});menu.append(heading);
+    groupHeadings.push({heading,entries});
     for(const [href,symbol] of entries){
       const a=links.get(href);if(!a)continue;
       const label=a.textContent;a.replaceChildren(el('span',{className:'ap-nav-icon',textContent:symbol}),el('span',{className:'ap-nav-label',textContent:label}));a.title=label;a.setAttribute('aria-label',label);
@@ -111,7 +113,7 @@
   mobile.addEventListener('click',()=>{collapse(false);const open=document.body.classList.toggle('ap-drawer');mobile.setAttribute('aria-expanded',String(open))});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('ap-drawer');mobile.setAttribute('aria-expanded','false')}});
   function syncSections(){
-    if(!activeSub)return;
+    if(!activeSub||activeRow?.hidden)return;
     const source=document.querySelector('.admin-nav,#crmNav,#tabs,.ainbox-tabs');
     if(!source)return;
     const controls=Array.from(source.querySelectorAll('button,a')).filter(b=>!b.hidden&&!b.disabled&&b.textContent.trim());
@@ -151,6 +153,10 @@
     $('apStudioLink').hidden = !(hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator));
     [['/portfolio-management/','portfolio_management'],['/work-board/','work_board'],['/training/','training'],['/prompts/','prompt_library'],['/knowledge-base/','knowledge_base'],['/action-inbox/','action_inbox'],['/crm/','crm'],['/news-watch/','news_watch']].forEach(([href,key])=>{const a=nav.querySelector('a[href="'+href+'"]');if(a)a.hidden=!hasFeature(key)});
     for(const a of links.values())a.parentElement.hidden=a.hidden;
+    for(const {heading,entries} of groupHeadings){
+      heading.hidden=!entries.some(([href])=>{const a=links.get(href);return a&&!a.hidden&&!a.parentElement.hidden;});
+    }
+    if(activeSub&&activeRow?.hidden)activeSub.hidden=true;
     syncSections();
     $('apWho').textContent = profile.full_name || profile.email || '';
     $('apAvatar').textContent=(profile.full_name || profile.email || 'U').split(/[\\s@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('');

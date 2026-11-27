@@ -35,3 +35,17 @@ test('RSS and Atom feeds retain source attribution and reject XML declarations w
   assert.equal(parseFeed(atom, origin)[0].url, 'https://feeds.example.com/filing');
   assert.throws(() => parseFeed('<!DOCTYPE rss [<!ENTITY x SYSTEM "file:///etc/passwd">]>'+rss, origin), /Unsupported/);
 });
+
+test('SEC EDGAR fixtures yield primary filing links and exclude old entries', async () => {
+  const {edgarEvidence} = await import('../supabase/functions/sentinel-worker/evidence.mjs');
+  const data = {name:'Example',filings:{recent:{
+    form:['8-K','10-Q','4'],
+    filingDate:['2026-11-27','2026-01-01','2026-11-27'],
+    accessionNumber:['0000000123-26-000001','0000000123-26-000002','0000000123-26-000003'],
+    primaryDocument:['report.htm','old.htm','owner.xml'],
+  }}};
+  const items = edgarEvidence('0000000123', data, '2026-11-01');
+  assert.equal(items.length, 1);
+  assert.equal(items[0].source_classification, 'regulatory');
+  assert.equal(items[0].url, 'https://www.sec.gov/Archives/edgar/data/123/000000012326000001/report.htm');
+});

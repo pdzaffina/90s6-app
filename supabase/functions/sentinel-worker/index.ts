@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import { isTransientStatus, MAX_ATTEMPTS, retryAfterSeconds, retryDelay } from './retry.mjs';
 
-import { allowedFeedUrl, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
+import { allowedFeedUrl, edgarEvidence, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
 
 async function boundedBody(response:Response, maxBytes=1_000_000){
  const reader=response.body?.getReader();
@@ -20,6 +20,8 @@ async function boundedBody(response:Response, maxBytes=1_000_000){
   await reader.cancel().catch(()=>{});
  }
 }
+
+import { validateReport } from './report.mjs';
 
 class ProviderError extends Error {
  constructor(message: string, readonly transient: boolean, readonly retryAfter = 0) {
@@ -120,6 +122,23 @@ Deno.serve(async req=>{
    failures.push(failure);
   }
  }
+ if(context.sec_cik){
+  try{
+   const userAgent=Deno.env.get('SENTINEL_SEC_USER_AGENT')?.trim();
+   if(!userAgent||!/[^\s@]+@[^\s@]+\.[^\s@]+/.test(userAgent)){
+    throw new ProviderError('SEC EDGAR contact is not configured.',false);
+   }
+   const cik=String(context.sec_cik).padStart(10,'0');
+   const url=new URL('https://data.sec.gov/submissions/CIK'+cik+'.json');
+   const response=await providerFetch('sec-edgar',url,{'User-Agent':userAgent,Accept:'application/json'});
+   const data=JSON.parse(await boundedBody(response,2_000_000));
+   const earliest=new Date(Date.now()-lookback*86400000).toISOString().slice(0,10);
+   evidence.unshift(...edgarEvidence(cik,data,earliest));
+   coverage=true;
+  }catch(failure){
+   failures.push(failure);
+  }
+ }
  if(failures.length){
   const typed=failures.filter((cause):cause is ProviderError=>cause instanceof ProviderError);
   status=coverage?'partial':'failed';
@@ -147,7 +166,7 @@ Deno.serve(async req=>{
  const cfg=reservation.data;
  if(cfg){
  usage=cfg.usage_id;
- const response=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(cfg.payload),signal:AbortSignal.timeout(Math.min(65000,Math.max(5000,Number(cfg.timeout_ms)||20000)))});
+ const response=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(cfg.payload),signal:AbortSignal.timeout(Math.min(55000,Math.max(5000,Number(cfg.timeout_ms)||20000)))});
  const data=await response.json();
  input=Number(data?.usage?.prompt_tokens)||0;output=Number(data?.usage?.completion_tokens)||0;cost=(input*Number(cfg.input_rate)+output*Number(cfg.output_rate))/1000000;billed=response.ok;
  const audit=await db.from('ainbox_ai_request_audit').update({response_payload:data,response_at:new Date().toISOString(),http_status:response.status,provider_request_id:response.headers.get('x-request-id'),input_tokens:input,output_tokens:output,estimated_usd:cost,error_message:response.ok?null:'Provider HTTP '+response.status}).eq('usage_id',usage);
@@ -155,7 +174,8 @@ Deno.serve(async req=>{
  if(!response.ok)throw Error('AI provider HTTP '+response.status);
  const raw=data?.choices?.[0]?.message?.content;
  if(typeof raw!=='string'||!raw.trim())throw Error('AI returned no visible assessment; check model and token budget');
- assessment=raw.trim().slice(0,16000);
+ try{assessment=JSON.stringify(validateReport(raw,evidence.length));}
+ catch{throw Error('AI output did not meet the report and citation requirements');}
  }
  }catch(e){status='partial';error='Assessment unavailable: '+(e instanceof Error?e.message:'AI request failed');if(usage)await db.from('ainbox_ai_request_audit').update({error_message:error,response_at:new Date().toISOString()}).eq('usage_id',usage);}
  finally{if(usage){const finish=await db.from('ainbox_ai_usage').update({status:billed?'completed':'failed',reserved_usd:0,input_tokens:input,output_tokens:output,estimated_usd:cost}).eq('id',usage).eq('status','reserved');if(finish.error){assessment=null;status='partial';error='AI usage finalization failed';}}}

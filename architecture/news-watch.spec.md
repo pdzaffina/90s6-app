@@ -46,10 +46,10 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | --- | --- |
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
 | 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Collection and assessment stages and Global Admin operations panel added. Investigation stage and scheduled and cross-tenant end-to-end tests pending. |
-| 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. Production preferred-feed verification, SEC, expanded entity context, source verification, and syndicated-content grouping pending. |
-| 3 | Existing single governed assessment and Markdown renderer. Bounded investigation, structured citations, independent AI features, and model and mobile verification pending. |
-| 4 | Existing per-run assessment history. Structured risk and longitudinal comparison pending. |
-| 5 | Existing manual email and copy. Threshold alerts, digests, preferences, acknowledgment, and assessment deep links pending. |
+| 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. SEC EDGAR adapter and CIK watch field added. Production preferred-feed and SEC verification, expanded entity context, source verification, and syndicated-content grouping pending. |
+| 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Independent AI features, bounded follow-up, model and mobile verification pending. |
+| 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
+| 5 | Manual email and copy include authenticated assessment links. Threshold alerts, digests, preferences, and acknowledgment pending. |
 | 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
 | 7 | Existing CSV import with basic duplicate detection. Native XLSX, mapping, and bulk management pending. |
 | 8 | Existing watch overview. Executive intelligence metrics, filters, trends, and briefing generation pending. |
@@ -83,3 +83,11 @@ Providers return bounded normalized evidence for a watch. GDELT and Google News 
 The private evidence table is keyed by organization, watch, and a SHA-256 fingerprint of the canonical URL. The checkpoint preserves the first observation while retaining run-level evidence and visible recently collected versus previously collected labels. URLs and publication timestamps are normalized, and attribution is retained. Historical pre-index assessments and evidence remain readable. A URL match identifies previously indexed evidence for that watch. Cross-publisher syndication and coverage before indexing are outside that measure.
 
 The evidence migration is additive. To roll back the provider changes, deploy the preceding worker and revert the matching UI changes. Retain indexed evidence and watch configuration columns. Keep the service-only checkpoint and context RPCs available for any in-flight invocation.
+
+### SEC collection and structured assessments
+
+For a U.S. reporting watch, enter its verified SEC CIK. The worker calls the fixed SEC EDGAR submissions endpoint and indexes selected material forms as regulatory evidence. Production EDGAR requests require `SENTINEL_SEC_USER_AGENT` with the organization name and a monitored contact email. The adapter reports partial coverage when that configuration is missing. Each public feed and EDGAR use the provider gate independently.
+
+The existing Sentinel assessment feature still owns the model, budget and audit. It now requests versioned structured assessment content, validates every source reference against the evidence passed to the model, and stores history per scan. Reports label the kind of development and display confidence independently from severity. Recommendations are advisory. Compared assessments show changes in risk categories, severity and confidence, without interpreting an omitted risk as resolved. Short links in manual email and copy resolve through the signed-in user's existing watch permissions. Historic Markdown remains readable.
+
+To roll back structured assessments, restore the earlier `sentinel_ai_begin` definition and worker. Keep the newer report renderer deployed to display historical structured reports. The CIK and relationship columns are additive and may remain.

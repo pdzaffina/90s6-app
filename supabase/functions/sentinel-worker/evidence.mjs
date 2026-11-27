@@ -116,3 +116,31 @@ export function watchQuery(name, context) {
     ...quoted(terms(context.excluded_terms)).map(term => '-'+term),
   ].join(' ');
 }
+
+const MATERIAL_FORMS = new Set(['8-K', '10-K', '10-Q', '6-K', '20-F', '40-F', 'S-1', 'F-1', 'DEF 14A']);
+
+export function edgarEvidence(cik, data, earliest) {
+  const filings = data?.filings?.recent;
+  if (!Array.isArray(filings?.form) || !Array.isArray(filings?.filingDate)
+      || !Array.isArray(filings?.accessionNumber) || !Array.isArray(filings?.primaryDocument)) {
+    throw new Error('Invalid SEC EDGAR submissions response');
+  }
+  const items = [];
+  for (const [index, form] of filings.form.entries()) {
+    const date = filings.filingDate[index];
+    const accession = filings.accessionNumber[index];
+    const document = filings.primaryDocument[index];
+    if (!MATERIAL_FORMS.has(String(form).replace(/\/A$/, ''))
+        || !/^\d{4}-\d{2}-\d{2}$/.test(date) || date < earliest
+        || !/^\d{10}-\d{2}-\d{6}$/.test(accession) || !/^[A-Za-z0-9_.-]+$/.test(document)
+        || document === '.' || document === '..') continue;
+    items.push({
+      url: 'https://www.sec.gov/Archives/edgar/data/'+Number(cik)+'/'+accession.replaceAll('-', '')+'/'+document,
+      title: String(data.name || 'Issuer')+' filed Form '+form,
+      published: date,
+      source: 'SEC EDGAR',
+    });
+    if (items.length >= 15) break;
+  }
+  return normalizeEvidence(items, 'sec-edgar', 'regulatory');
+}

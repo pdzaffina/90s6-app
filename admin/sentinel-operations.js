@@ -49,6 +49,29 @@
     results.replaceChildren(summary, heading, providers);
   }
 
+  async function showGdelt(){
+    const section=document.createElement('section');
+    const heading=document.createElement('h3');heading.textContent='GDELT local intelligence index';
+    const button=document.createElement('button');button.type='button';button.className='ap-btn';button.textContent='Collect now';
+    const status=document.createElement('p');status.setAttribute('role','status');
+    const detail=document.createElement('div');
+    section.append(heading,button,status,detail);results.append(section);
+    async function update(collect=false){
+      button.disabled=true;
+      try{
+        const {data,error}=await App.sb.rpc('sentinel_gdelt_operations',{p_collect:collect});
+        if(error)throw error;
+        const summary=document.createElement('p');
+        summary.textContent=[Number(data.articles).toLocaleString()+' articles',(data.bytes/1048576).toFixed(1)+' MiB storage','Latest completed feed: '+timestamp(data.latest),...Object.entries(data.counts).map(([k,v])=>v+' '+k)].join(' · ');
+        const history=document.createElement('ul');history.style.cssText='max-height:320px;overflow:auto;overflow-wrap:anywhere';
+        for(const row of data.history){const li=document.createElement('li');li.textContent=[timestamp(row.slot),row.status,row.records+' records',row.attempts+' attempts',row.error].filter(Boolean).join(' · ');history.append(li)}
+        detail.replaceChildren(summary,history);
+        status.textContent=collect?'Collection requested. Queued files are processed in the background. Refresh to check progress.':'';
+      }catch(e){status.textContent=e.message||'GDELT operations unavailable.'}
+      finally{button.disabled=false}
+    }
+    button.addEventListener('click',()=>update(true));await update();
+  }
   async function load() {
     refresh.disabled = true;
     message.textContent = 'Loading Sentinel operations…';
@@ -56,6 +79,7 @@
       const { data, error } = await App.sb.rpc('sentinel_operations');
       if (error) throw error;
       showMetrics(data);
+      await showGdelt();
       message.textContent = '';
     } catch {
       message.textContent = 'Sentinel operations could not load. Try Refresh.';

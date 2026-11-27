@@ -268,7 +268,7 @@ Deno.serve(async req=>{
    if(reservation.error)throw Error('Assessment settings or budget unavailable');
    if(reservation.data){
     assessment=await callAI(reservation.data,55000,raw=>{
-     try{return JSON.stringify(validateReport(raw,evidence.length));}
+     try{return JSON.stringify(validateReport(raw,evidence));}
      catch{throw Error('AI output did not meet the report and citation requirements');}
     });
    }

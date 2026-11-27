@@ -23,7 +23,9 @@ test('report validation keeps severity and confidence independent', () => {
 test('report validation refuses fabricated source numbers and unreferenced claims', () => {
   for (const sources of [[2], [], [0], ['1']]) {
     const altered = {...report, summary:{text:'Unsupported.',sources}};
-    assert.throws(() => validateReport(JSON.stringify(altered), 1), /evidence reference/);
+    const validated=validateReport(JSON.stringify(altered),1);
+    assert.equal(validated.summary.text,report.developments[0].text);
+    assert.deepEqual(validated.summary.sources,[1]);
   }
 });
 
@@ -42,4 +44,18 @@ test('recommendation metadata without an action leaves the cited report availabl
   }]}),1);
   assert.deepEqual(result.recommendations,[]);
   assert.equal(result.risks.length,1);
+});
+
+test('a risk without citations is omitted without discarding cited findings', () => {
+  const result=validateReport(JSON.stringify({...report,risks:[
+    report.risks[0],{...report.risks[0],category:'regulatory_legal',sources:[]},
+  ]}),1);
+  assert.equal(result.risks.length,1);
+  assert.match(result.limitations.at(-1),/omitted/);
+  assert.throws(()=>validateReport(JSON.stringify({...report,summary:'Uncited',developments:[],risks:[]}),1),/no statements/);
+});
+
+test('secondary evidence cannot support a verified-fact badge', () => {
+  const output=validateReport(JSON.stringify(report),[{source_role:'secondary'}]);
+  assert.equal(output.developments[0].kind,'reported_claim');
 });

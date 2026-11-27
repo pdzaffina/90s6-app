@@ -8,6 +8,26 @@
   let org, limit=250;
   const limitInput=panel.querySelector('#sentinelSourceLimit');
 
+  const saved=document.createElement('section');
+  const heading=document.createElement('h3');heading.textContent='Saved sources';
+  const count=document.createElement('p');
+  const filter=document.createElement('input');filter.type='search';filter.className='ap-input';filter.placeholder='Filter saved domains';filter.setAttribute('aria-label','Filter saved domains');
+  const results=document.createElement('div');results.style.cssText='max-height:360px;overflow:auto;overflow-wrap:anywhere';
+  saved.append(heading,count,filter,results);panel.append(saved);
+  let persisted=[];
+  function renderSaved(){
+    const q=filter.value.trim().toLowerCase();
+    const matches=persisted.filter(d=>d.includes(q));
+    count.textContent=persisted.length+' saved sources'+(q?' · '+matches.length+' matching':'');
+    results.replaceChildren();
+    if(!matches.length){const empty=document.createElement('p');empty.textContent=q?'No matching sources.':'No sources saved for this scope.';results.append(empty);return;}
+    const ul=document.createElement('ul');
+    for(const domain of matches){const li=document.createElement('li');const a=document.createElement('a');a.textContent=domain;a.href='https://'+domain;a.target='_blank';a.rel='noopener noreferrer';li.append(a);ul.append(li)}
+    results.append(ul);
+  }
+  filter.addEventListener('input',renderSaved);
+  count.textContent='Loading saved sources…';
+  function showSaved(data){persisted=Array.isArray(data)?[...data].sort():[];renderSaved();}
   function normalize(value) {
     const url = new URL(/^[a-z]+:\/\//i.test(value) ? value : 'https://' + value);
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.port ||
@@ -26,6 +46,7 @@
       const {data,error} = await App.sb.rpc('sentinel_admin_sources', {p_org:org,p_domains:domains});
       if (error) throw error;
       list.value = data.join('\n');
+      showSaved(data);
       feedback.textContent = data.length+' sources saved (limit '+limit+').';
     } catch (error) {
       feedback.textContent = error.message || 'Sources could not be saved.';
@@ -53,9 +74,11 @@
     const {data,error} = await App.sb.rpc('sentinel_admin_sources', {p_org:org});
     if (error) {
       feedback.textContent = 'Sources could not load.';
+      count.textContent='Saved sources unavailable.';
       return;
     }
     list.value = data.join('\n');
+      showSaved(data);
     submit.disabled = false;
   });
 })();

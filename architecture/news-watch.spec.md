@@ -45,7 +45,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | Phase | Current scope and remaining verification |
 | --- | --- |
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
-| 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Detailed stages, monitoring, and scheduled and cross-tenant end-to-end tests pending. |
+| 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Collection and assessment stages and Global Admin operations panel added. Investigation stage and scheduled and cross-tenant end-to-end tests pending. |
 | 2 | Existing Google News RSS and GDELT fallback. Modular providers, watch configuration, SEC, configured feeds, and cross-scan normalization pending. |
 | 3 | Existing single governed assessment and Markdown renderer. Bounded investigation, structured citations, independent AI features, and model and mobile verification pending. |
 | 4 | Existing per-run assessment history. Structured risk and longitudinal comparison pending. |
@@ -67,3 +67,11 @@ The managed runtime checks GDELT first and uses Google News RSS when GDELT fails
 After the queue eligibility migration, a production manual smoke scan started in 0.24 seconds, completed with eight sources, and stored an AI assessment. Worker claim and token RPC grants were checked, and a tokenless production request returned HTTP 401.
 
 To roll back retries, redeploy the worker from commit `7e67e9cfbb875be2f1d8821b4699fcde81d9551e` and restore the claim function and original private dispatch function in a forward migration. Additive retry columns and private cooldown data may remain. Any queued retry will become eligible under the restored claim semantics.
+
+### Administration and troubleshooting
+
+Global Admin → Sentinel operations shows queue depth, oldest pending scan, recent completion and failure counts, average execution duration, retry counts, audited AI failures, and observed provider status. Refresh to retrieve current metrics. Failed or missing collection is displayed separately from the assessment. A Partial scan can still contain evidence and a valid AI assessment.
+
+After deploying the retry-capable worker, a production manual scan began in 0.35 seconds and stored eight sources with a governed AI assessment. GDELT was unavailable and the scan correctly finished Partial using Google News RSS. A second submission while that scan was active returned no duplicate run, and a transaction-scoped cooldown check denied a GDELT slot during the cooldown.
+
+The operations migration is additive. Reverting the related UI commit hides the panel. The preceding worker version runs without provider result logging. Keep the restricted metrics RPC and columns in place during a frontend or worker rollback.

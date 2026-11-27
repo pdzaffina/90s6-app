@@ -28,7 +28,11 @@ Deno.serve(async req=>{
   if(gate.error||!gate.data)throw new ProviderError(provider+' temporarily unavailable',true);
   let response:Response;
   try{response=await fetch(url,{signal:AbortSignal.timeout(15000),redirect:'error',headers});}
-  catch{throw new ProviderError(provider+' request failed',true);}
+  catch{
+   await db.rpc('sentinel_note_provider_result',{p_provider:provider,p_status:0});
+   throw new ProviderError(provider+' request failed',true);
+  }
+  await db.rpc('sentinel_note_provider_result',{p_provider:provider,p_status:response.status});
   if(response.ok)return response;
   const delay=retryAfterSeconds(response.headers.get('retry-after'));
   if(response.status===429||delay){

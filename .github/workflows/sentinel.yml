@@ -8,6 +8,7 @@ on:
       - 'supabase/functions/sentinel-worker/**'
       - 'supabase/migrations/*sentinel*'
       - 'news-watch/**'
+      - 'admin/sentinel-operations.js'
 permissions:
   contents: read
 jobs:
@@ -20,3 +21,4 @@ jobs:
           node-version: '22'
       - run: node --test scripts/sentinel-*.test.mjs
       - run: node --check news-watch/news-watch.js
+      - run: node --check admin/sentinel-operations.js

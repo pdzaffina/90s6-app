@@ -32,3 +32,30 @@ Foundation, import, collection, AI, scheduling, dashboard and integrations. Sear
 
 ## Search provider decision (2026-11-26)
 GDELT DOC API is the default keyless news discovery provider. Brave is optional and selected only through SENTINEL_SEARCH_PROVIDER=brave plus its secret. GDELT returns indexed article metadata, not full text. Default lookback is seven days; requests are paced. RSS and governed Nemotron tool calling are follow-on work. Do not treat empty coverage as proof of no risk.
+
+## Verified production baseline (2026-11-27)
+
+- GitHub main at `ea87a1efc13c7d896b03f3069dd73320ccb5aa2f` includes the native worker, Cron dispatch, removal of the GitHub runtime, governed assessment generation, and formatted Markdown reports.
+- Production had Sentinel worker version 3, four Sentinel-related migrations, and an active every-minute `sentinel-edge-worker` Cron job. Cron recorded 60 successful SQL dispatches in the checked hour. SQL dispatch success alone does not establish Edge Function success.
+- Across 11 production scans, nine were complete, one partial, and one failed. Six complete scans had stored AI assessments. The assessment path exists in both main and the production database. Further end-to-end testing is required to distinguish model, authorization, budget, and collection outcomes.
+- The existing six Node tests cover the retired worker's provider and configuration behavior. They do not exercise the production Edge Function or database.
+
+## Implementation checklist
+
+| Phase | Current scope and remaining verification |
+| --- | --- |
+| 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
+| 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Retry leases, shared throttling, stages, monitoring, and authenticated end-to-end tests pending. |
+| 2 | Existing Google News RSS and GDELT fallback. Modular providers, watch configuration, SEC, configured feeds, and cross-scan normalization pending. |
+| 3 | Existing single governed assessment and Markdown renderer. Bounded investigation, structured citations, independent AI features, and model and mobile verification pending. |
+| 4 | Existing per-run assessment history. Structured risk and longitudinal comparison pending. |
+| 5 | Existing manual email and copy. Threshold alerts, digests, preferences, acknowledgment, and assessment deep links pending. |
+| 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
+| 7 | Existing CSV import with basic duplicate detection. Native XLSX, mapping, and bulk management pending. |
+| 8 | Existing watch overview. Executive intelligence metrics, filters, trends, and briefing generation pending. |
+
+### Queue operations and rollback
+
+`20261127_01_sentinel_queue_eligibility.sql` updates the existing RPCs in place. New manual scans trigger the same private, single-use Cron dispatch function. The minute Cron cadence remains available to process pending jobs. The worker cancels queued scans when watch, user, organization, or application access is withdrawn. Scheduled candidates are interleaved by organization and collected in batches of 50. Claims favor organizations whose jobs were least recently started. The existing unique pending-watch index and row locking still enforce one pending scan per watch.
+
+To roll back, restore the prior definitions of `public.sentinel_queue(uuid)` and `public.sentinel_claim()` from migrations `20261126_01_news_watch.sql` and `20261126_02_sentinel_worker.sql` in a new migration using `create or replace`. The additive indexes and private helper can remain. Revert the matching News Watch UI commit and redeploy GitHub Pages if the issue is in polling or status presentation. Scan history remains available.

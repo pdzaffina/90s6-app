@@ -5,6 +5,8 @@ on:
     paths:
       - 'scripts/sentinel-worker*'
       - 'supabase/functions/sentinel-worker/**'
+      - 'supabase/migrations/*sentinel*'
+      - 'news-watch/**'
 permissions:
   contents: read
 jobs:
@@ -16,3 +18,4 @@ jobs:
         with:
           node-version: '22'
       - run: node --test scripts/sentinel-worker.test.mjs
+      - run: node --check news-watch/news-watch.js

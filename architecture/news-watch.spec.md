@@ -45,7 +45,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | Phase | Current scope and remaining verification |
 | --- | --- |
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
-| 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Retry leases, shared throttling, stages, monitoring, and authenticated end-to-end tests pending. |
+| 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Detailed stages, monitoring, and scheduled and cross-tenant end-to-end tests pending. |
 | 2 | Existing Google News RSS and GDELT fallback. Modular providers, watch configuration, SEC, configured feeds, and cross-scan normalization pending. |
 | 3 | Existing single governed assessment and Markdown renderer. Bounded investigation, structured citations, independent AI features, and model and mobile verification pending. |
 | 4 | Existing per-run assessment history. Structured risk and longitudinal comparison pending. |
@@ -59,3 +59,11 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 `20261127_01_sentinel_queue_eligibility.sql` updates the existing RPCs in place. New manual scans trigger the same private, single-use Cron dispatch function. The minute Cron cadence remains available to process pending jobs. The worker cancels queued scans when watch, user, organization, or application access is withdrawn. Scheduled candidates are interleaved by organization and collected in batches of 50. Claims favor organizations whose jobs were least recently started. The existing unique pending-watch index and row locking still enforce one pending scan per watch.
 
 To roll back, restore the prior definitions of `public.sentinel_queue(uuid)` and `public.sentinel_claim()` from migrations `20261126_01_news_watch.sql` and `20261126_02_sentinel_worker.sql` in a new migration using `create or replace`. The additive indexes and private helper can remain. Revert the matching News Watch UI commit and redeploy GitHub Pages if the issue is in polling or status presentation. Scan history remains available.
+
+### Provider retries and verification
+
+The managed runtime checks GDELT first and uses Google News RSS when GDELT fails. A fallback scan is marked Partial. PostgreSQL coordinates request spacing across workers, with a six-second minimum between GDELT requests and two seconds for Google News RSS. A 429 extends the shared cooldown. If both providers fail and either failure is transient, the scan is deferred with exponential backoff and jitter for up to four total attempts. HTTP Retry-After is honored up to 24 hours. Expired worker leases become retryable, and attempts can save results only while their own lease remains current. Evidence is checkpointed before the AI request.
+
+After the queue eligibility migration, a production manual smoke scan started in 0.24 seconds, completed with eight sources, and stored an AI assessment. Worker claim and token RPC grants were checked, and a tokenless production request returned HTTP 401.
+
+To roll back retries, redeploy the worker from commit `7e67e9cfbb875be2f1d8821b4699fcde81d9551e` and restore the claim function and original private dispatch function in a forward migration. Additive retry columns and private cooldown data may remain. Any queued retry will become eligible under the restored claim semantics.

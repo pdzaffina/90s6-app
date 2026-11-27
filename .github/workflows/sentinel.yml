@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'scripts/sentinel-worker*'
+      - 'scripts/sentinel-retry.test.mjs'
       - 'supabase/functions/sentinel-worker/**'
       - 'supabase/migrations/*sentinel*'
       - 'news-watch/**'
@@ -17,5 +18,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test scripts/sentinel-worker.test.mjs
+      - run: node --test scripts/sentinel-*.test.mjs
       - run: node --check news-watch/news-watch.js

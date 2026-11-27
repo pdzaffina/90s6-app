@@ -457,9 +457,15 @@ async function showDevelopments(){
  const groups=new Map();
  for(const d of result.data){if(!groups.has(d.watch_id))groups.set(d.watch_id,[]);groups.get(d.watch_id).push(d)}
  for(const [watchId,developments] of [...groups].sort((a,b)=>(watches.find(w=>w.id===a[0])?.name||'').localeCompare(watches.find(w=>w.id===b[0])?.name||''))){
- const group=el('section');group.className='nw-card';
- const heading=el('h3',watches.find(w=>w.id===watchId)?.name||'Watch');
- group.append(heading,el('p',developments.length+' developments'));
+ const group=el('details');group.className='nw-card nw-development-group';
+ const watch=watches.find(w=>w.id===watchId);
+ const heading=el('summary');heading.className='nw-development-summary';
+ const name=el('strong',watch?.name||'Watch');
+ const latest=developments.reduce((date,d)=>Math.max(date,Date.parse(d.last_seen_at)||0),0);
+ const count=developments.reduce((total,d)=>total+Number(d.evidence_count||0),0);
+ const meta=el('span',[watch?.category,developments.length+' developments',count+' evidence items',latest?'Latest new evidence '+new Date(latest).toLocaleDateString():''].filter(Boolean).join(' · '));
+ meta.className='nw-development-meta';
+ heading.append(name,meta);group.append(heading);
  panel.append(group);
  for(const d of developments){
   const item=el('details');item.append(el('summary',d.title),el('p', (watches.find(w=>w.id===d.watch_id)?.name||'Watch')+' · '+d.evidence_count+' evidence items · First observed '+new Date(d.first_seen_at).toLocaleDateString()+' · Latest new evidence '+new Date(d.last_seen_at).toLocaleDateString()));

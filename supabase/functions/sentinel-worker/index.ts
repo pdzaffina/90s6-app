@@ -24,6 +24,13 @@ async function boundedBody(response:Response, maxBytes=1_000_000){
 import { validateReport } from './report.mjs';
 import { investigationTerms } from './investigation.mjs';
 
+type Evidence = ReturnType<typeof normalizeEvidence>[number] & {
+ source_role?: string;
+ story_key?: string;
+ new_development?: boolean;
+ relevance?: string;
+};
+
 class ProviderError extends Error {
  constructor(message: string, readonly transient: boolean, readonly retryAfter = 0) {
   super(message);
@@ -78,7 +85,7 @@ Deno.serve(async req=>{
    ?? reply({status:'failed'});
  }
  const lookback=Number(context.lookback_days)||7;
- let evidence:ReturnType<typeof normalizeEvidence>=[],status='complete',error:string|null=null;
+ let evidence:Evidence[]=[],status='complete',error:string|null=null;
  let failures:unknown[]=[];
  const rss=async(u:URL,provider:string,sourceClass:string)=>{
   const r=await providerFetch(provider,u,{Accept:'application/rss+xml, application/atom+xml, application/xml, text/xml'});
@@ -262,13 +269,18 @@ Deno.serve(async req=>{
   const stage=await save({stage:'assessment'});
   if(stage)return stage;
   try{
+   const sources=evidence.slice(0,24);
    const reservation=await db.rpc('sentinel_ai_begin',{
-    p_run:job.id,p_evidence:evidence.map((item,index)=>({...item,source_number:index+1}))
+    p_run:job.id,p_evidence:sources.map((item,index)=>({
+     source_number:index+1,title:item.title,source:item.source,published:item.published,
+     source_role:item.source_role,story_key:item.story_key,
+     new_development:item.new_development,relevance:item.relevance,
+    }))
    });
    if(reservation.error)throw Error('Assessment settings or budget unavailable');
    if(reservation.data){
     assessment=await callAI(reservation.data,55000,raw=>{
-     try{return JSON.stringify(validateReport(raw,evidence));}
+     try{return JSON.stringify(validateReport(raw,sources));}
      catch{throw Error('AI output did not meet the report and citation requirements');}
     });
    }

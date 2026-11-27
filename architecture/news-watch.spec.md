@@ -120,7 +120,7 @@ Authorized Work Board editors can open a task draft from an accessible assessmen
 
 ### Assessment output budget
 
-The 2026-11-27 Aristocrat Interactive scan saved nine sources. The model used all 4,096 configured completion tokens for reasoning before producing report content. The runtime now supplies a model-specific reasoning budget for Nemotron Lightning while preserving the configured model and total output-token limit. Scan History shows a pending assessment as in progress and reserves failure text for terminal or retry states.
+The 2026-11-27 Aristocrat Interactive scan saved nine sources. The model used all 4,096 configured completion tokens for reasoning before producing report content. The runtime uses bounded reasoning for Nemotron Lightning planning and compact direct JSON generation for its final report, preserving the configured model and total output-token limit. Scan History shows a pending assessment as in progress and reserves failure text for terminal or retry states.
 
 ### Executive briefings and advisory risk review
 

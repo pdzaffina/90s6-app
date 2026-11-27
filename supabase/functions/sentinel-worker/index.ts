@@ -126,7 +126,13 @@ Deno.serve(async req=>{
  try{
   const sources=await db.rpc('sentinel_scan_sources',{p_run:job.id,p_started_at:job.started_at});
   if(sources.error)throw Error('Could not load administrator source lists');
-  const domains:string[]=sources.data??[];
+  const allDomains:string[]=sources.data??[];
+  const history=await db.from('sentinel_scan_runs').select('id',{count:'exact',head:true}).eq('watch_id',job.watch_id).eq('org_id',job.org_id).lt('created_at',job.created_at);
+  if(history.error)throw Error('Could not determine source rotation');
+  const batches=Math.ceil(allDomains.length/8);
+  const batch=batches?(history.count??0)%batches:0;
+  const domains=allDomains.slice(batch*8,batch*8+8);
+  if(allDomains.length>domains.length)failures.push(new ProviderError('Source rotation: batch '+(batch+1)+' of '+batches+' ('+domains.length+' of '+allDomains.length+' configured domains selected; others deferred)',false));
   if(domains.length){
    const delay=Math.max(0,2200-(Date.now()-lastGoogleSearch));
    if(delay)await new Promise(resolve=>setTimeout(resolve,delay));

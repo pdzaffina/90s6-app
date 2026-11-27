@@ -39,6 +39,7 @@ export function normalizeEvidence(items, provider, sourceClass, collectedAt = ne
       published: publicationTimestamp(item.published),
       collected_at: collectedAt,
       source: String(item.source || new URL(url).hostname).slice(0, 200),
+      ...(item.publisher_url ? {publisher_url:canonicalUrl(item.publisher_url)} : {}),
       provider,
       source_classification: sourceClass,
     });
@@ -94,7 +95,8 @@ export function parseFeed(xml, feedUrl) {
     try {
       items.push({url:new URL(link,feedUrl).href,title:field(entry,'title'),
         published:field(entry,atom?'published':'pubDate')||field(entry,'updated'),
-        source:field(entry,'source').replace(/<[^>]*>/g,'')});
+        source:field(entry,'source').replace(/<[^>]*>/g,''),
+        publisher_url:feedText(entry.match(/<source\b[^>]*\burl=["']([^"']+)["']/i)?.[1] ?? '')});
     } catch {
       continue;
     }
@@ -161,4 +163,16 @@ export function describeEvidence(items, watchName, context) {
     const label=regulatory?'primary':'secondary';
     return {...item,story_key:storyKey,source_role:label,relevance:regulatory?'issuer filing':score?'matched watch context':'search result'};
   });
+}
+
+export function evidenceFromDomains(items, domains) {
+  return items.filter(item => [item.url,item.publisher_url].some(value => {
+    if (!value) return false;
+    try {
+      const host = new URL(value).hostname;
+      return domains.some(domain => host === domain || host.endsWith('.'+domain));
+    } catch {
+      return false;
+    }
+  }));
 }

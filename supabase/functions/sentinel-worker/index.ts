@@ -1,7 +1,7 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import { isTransientStatus, MAX_ATTEMPTS, retryAfterSeconds, retryDelay } from './retry.mjs';
 
-import { allowedFeedUrl, describeEvidence, edgarEvidence, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
+import { allowedFeedUrl, describeEvidence, edgarEvidence, evidenceFromDomains, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
 
 async function boundedBody(response:Response, maxBytes=1_000_000){
  const reader=response.body?.getReader();
@@ -93,7 +93,9 @@ Deno.serve(async req=>{
    return normalizeEvidence(parseFeed(await boundedBody(r),u.href),provider,sourceClass);
   }catch{throw new ProviderError(provider+' returned an unreadable feed',true);}
  };
+ let lastGoogleSearch=0;
  const google=async(search=query)=>{
+  lastGoogleSearch=Date.now();
   const u=new URL('https://news.google.com/rss/search');
   for(const [k,v] of Object.entries({q:search+' when:'+lookback+'d',hl:'en-US',gl:'US',ceid:'US:en'}))u.searchParams.set(k,v);
   return rss(u,'google-news-rss','other');
@@ -120,6 +122,22 @@ Deno.serve(async req=>{
   }catch(secondary){
    failures.push(secondary);
   }
+ }
+ try{
+  const sources=await db.rpc('sentinel_scan_sources',{p_run:job.id,p_started_at:job.started_at});
+  if(sources.error)throw Error('Could not load administrator source lists');
+  const domains:string[]=sources.data??[];
+  if(domains.length){
+   const delay=Math.max(0,2200-(Date.now()-lastGoogleSearch));
+   if(delay)await new Promise(resolve=>setTimeout(resolve,delay));
+   const scoped=await google(query+' ('+domains.map(domain=>'site:'+domain).join(' OR ')+')');
+   const preferred=evidenceFromDomains(scoped,domains);
+   const urls=new Set(preferred.map(item=>item.url));
+   evidence=[...preferred,...evidence.filter(item=>!urls.has(item.url))];
+   coverage=true;
+  }
+ }catch{
+  failures.push(new ProviderError('Administrator source search did not finish',true));
  }
  if(context.feed_url){
   try{

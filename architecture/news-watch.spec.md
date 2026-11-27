@@ -139,3 +139,7 @@ Turn on “Send significant findings to Action Inbox” on a watch whose owner h
 - Browser fixtures check desktop and mobile layouts, citation links, persisted assessment links, and pending-state copy. The stored report renderer accepts both structured reports and older Markdown.
 - SEC and approved preferred-feed adapters have fixture coverage. A live SEC check requires the approved User-Agent contact. A live preferred-feed check requires a host explicitly approved for this project.
 - Cross-publisher story grouping uses normalized title matches. Variants with substantially different headlines can still require human corroboration. Source reclassification and contradiction review remain limited by the available evidence.
+
+### Administrator source lists
+
+Global Admin and Organization Admin each have a Sentinel sources section. Enter up to eight website URLs or domains per scope, separated by commas or new lines. The editor saves domains. A scan searches the union of the global list and its organization's list for the current watch using Google News. Matched results are prioritized for assessment. Coverage depends on what Google News indexes. The worker sends the configured domains as search filters and does not fetch user-entered URLs directly.

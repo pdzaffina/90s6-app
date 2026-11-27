@@ -5,13 +5,15 @@ function init(){
  const isTenant=!!document.getElementById('tenantAdminPanel');
  let panels=[];
  if(isTenant){
-   const nodes=Array.from(root.children);
+   const sources=root.querySelector('#sentinelSourcePanel');
+   const nodes=Array.from(root.children).filter(node=>node!==sources);
    const groups=[
      {title:'Members',start:0,end:nodes.findIndex(n=>n.tagName==='H3'&&/Member application access/i.test(n.textContent))},
      {title:'Application access',start:nodes.findIndex(n=>n.tagName==='H3'&&/Member application access/i.test(n.textContent)),end:nodes.findIndex(n=>n.tagName==='H3'&&/Add or update a member/i.test(n.textContent))},
      {title:'Add or update member',start:nodes.findIndex(n=>n.tagName==='H3'&&/Add or update a member/i.test(n.textContent)),end:nodes.length}
    ];
    groups.forEach(g=>{if(g.start<0||g.end<=g.start)return;const p=document.createElement('section');p.className='ap-panel';const h=document.createElement('h2');h.textContent=g.title;p.append(h);nodes.slice(g.start,g.end).forEach(n=>{if(n.tagName==='H2'||n.tagName==='H3')return;p.append(n)});root.append(p);panels.push(p)});
+    if(sources)panels.push(sources);
  }else{panels=Array.from(root.children).filter(n=>n.matches('section.ap-panel'))}
  if(!panels.length)return;
  const workspace=document.createElement('div');workspace.className='admin-workspace';

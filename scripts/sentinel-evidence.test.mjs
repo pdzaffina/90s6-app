@@ -61,3 +61,12 @@ test('matching syndicated titles keep separate attribution and one story key', a
   assert.notEqual(rows[0].source,rows[1].source);
   assert.equal(rows[0].relevance,'matched watch context');
 });
+
+test('administrator source matches use exact publisher domains or their subdomains', async () => {
+  const {evidenceFromDomains,parseFeed,normalizeEvidence} = await import('../supabase/functions/sentinel-worker/evidence.mjs');
+  const feed='<rss><channel><item><title>One</title><link>https://news.google.com/item</link><source url="https://news.example.com">Example</source></item></channel></rss>';
+  const evidence=normalizeEvidence(parseFeed(feed,'https://news.google.com'),'google-news-rss','other');
+  assert.equal(evidenceFromDomains(evidence,['example.com']).length,1);
+  assert.equal(evidenceFromDomains(evidence,['other.example.com']).length,0);
+  assert.equal(evidenceFromDomains([{url:'https://fakeexample.com/story'}],['example.com']).length,0);
+});

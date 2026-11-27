@@ -49,10 +49,10 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. SEC EDGAR adapter and CIK watch field added. Production preferred-feed and SEC verification, expanded entity context, source verification, and syndicated-content grouping pending. |
 | 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Independent AI features, bounded follow-up, model and mobile verification pending. |
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
-| 5 | Manual email and copy include authenticated assessment links. Threshold alerts, digests, preferences, and acknowledgment pending. |
+| 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
 | 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
 | 7 | Existing CSV import with basic duplicate detection. Native XLSX, mapping, and bulk management pending. |
-| 8 | Existing watch overview. Executive intelligence metrics, filters, trends, and briefing generation pending. |
+| 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive AI briefing and broader history aggregation pending. |
 
 ### Queue operations and rollback
 
@@ -91,3 +91,11 @@ For a U.S. reporting watch, enter its verified SEC CIK. The worker calls the fix
 The existing Sentinel assessment feature still owns the model, budget and audit. It now requests versioned structured assessment content, validates every source reference against the evidence passed to the model, and stores history per scan. Reports label the kind of development and display confidence independently from severity. Recommendations are advisory. Compared assessments show changes in risk categories, severity and confidence, without interpreting an omitted risk as resolved. Short links in manual email and copy resolve through the signed-in user's existing watch permissions. Historic Markdown remains readable.
 
 To roll back structured assessments, restore the earlier `sentinel_ai_begin` definition and worker. Keep the newer report renderer deployed to display historical structured reports. The CIK and relationship columns are additive and may remain.
+
+### Notifications and executive dashboard
+
+News Watch → Notifications shows in-app alerts and digests scoped to the signed-in recipient and organization. Watch owners may opt into a severity threshold and control alerts and digest cadence per organization. Alerts require newly indexed cited evidence and an emerging or worsening risk. Notification keys prevent duplicate delivery from a scan. Daily digests and Monday weekly digests summarize finished scans at 14:00 UTC. Email remains a reviewed manual action with watch distribution recipients, CC, an executive summary, sources, and an authenticated link. No external delivery service is required.
+
+Overview uses the latest structured assessment per watch in the selected period for risk and trend views. It shows coverage, freshness, collection health, developments, and advisory actions. The browser uses the 200 most recent accessible scan records and identifies that limit when reached. Signed-in users switch organizations with the existing organization selector.
+
+To stop digest generation, unschedule `sentinel-digests`. To stop new in-app alerts, disable the `sentinel_publish_alert` trigger in a forward migration. Retain generated notification history and RLS. Roll back the UI through GitHub Pages independently.

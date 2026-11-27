@@ -117,3 +117,7 @@ Use Watchlist → Bulk import to map CSV or first-sheet XLSX columns, preview va
 News Watch can link a watch to an accessible CRM account and a specific assessment to an accessible portfolio initiative. Link creation requires target editor permission. The source watch and destination must remain accessible in the same organization to see the link. CRM and Portfolio show linked reports and their risk severity and confidence. Link creation does not update relationship health or portfolio ordering.
 
 Authorized Work Board editors can open a task draft from an accessible assessment. The task body has an authenticated link and a generic recommendation to review it. Board save and concurrency behavior continue to use the existing editor. For a shared watch, Content Studio creators can make a Knowledge Base draft with attribution and references, and review it through the usual publication workflow.
+
+### Assessment output budget
+
+The 2026-11-27 Aristocrat Interactive scan saved nine sources. The model used all 4,096 configured completion tokens for reasoning before producing report content. The runtime now supplies a model-specific reasoning budget for Nemotron Lightning while preserving the configured model and total output-token limit. Scan History shows a pending assessment as in progress and reserves failure text for terminal or retry states.

@@ -82,7 +82,9 @@ Deno.serve(async req=>{
  let failures:unknown[]=[];
  const rss=async(u:URL,provider:string,sourceClass:string)=>{
   const r=await providerFetch(provider,u,{Accept:'application/rss+xml, application/atom+xml, application/xml, text/xml'});
-  return normalizeEvidence(parseFeed(await boundedBody(r),u.href),provider,sourceClass);
+  try{
+   return normalizeEvidence(parseFeed(await boundedBody(r),u.href),provider,sourceClass);
+  }catch{throw new ProviderError(provider+' returned an unreadable feed',true);}
  };
  const google=async(search=query)=>{
   const u=new URL('https://news.google.com/rss/search');
@@ -93,9 +95,11 @@ Deno.serve(async req=>{
   const u=new URL('https://api.gdeltproject.org/api/v2/doc/doc');
   for(const [k,v] of Object.entries({query:search,mode:'artlist',format:'json',maxrecords:'30',timespan:lookback+'d',sort:'datedesc'}))u.searchParams.set(k,v);
   const r=await providerFetch('gdelt',u);
-  const data=JSON.parse(await boundedBody(r));
-  if(!Array.isArray(data.articles))throw Error('Invalid GDELT response');
-  return normalizeEvidence(data.articles.map((a:any)=>({...a,published:a.seendate,source:a.domain})),'gdelt','other');
+  try{
+   const data=JSON.parse(await boundedBody(r));
+   if(!Array.isArray(data.articles))throw Error('Invalid GDELT response');
+   return normalizeEvidence(data.articles.map((a:any)=>({...a,published:a.seendate,source:a.domain})),'gdelt','other');
+  }catch{throw new ProviderError('gdelt returned an unreadable search response',true);}
  };
  let coverage=false;
  try{
@@ -177,7 +181,12 @@ Deno.serve(async req=>{
    if(audit.error)throw Error('AI response audit failed');
    if(!response.ok)throw Error('AI provider HTTP '+response.status);
    const raw=data?.choices?.[0]?.message?.content;
-   if(typeof raw!=='string'||!raw.trim())throw Error('AI returned no visible output');
+   if(typeof raw!=='string'||!raw.trim()){
+    if(data?.choices?.[0]?.finish_reason==='length') {
+     throw Error('The selected model used its token limit before writing the report.');
+    }
+    throw Error('The selected model returned no report.');
+   }
    return read(raw);
   }catch(cause){
    await db.from('ainbox_ai_request_audit').update({

@@ -285,8 +285,26 @@ async function knowledgeDraft(run,watch,text){
  })));
  view.prepend(panel);
 }
+function scanOutcome(run){
+ const error=String(run.error||'');
+ const messages=[];
+ const names={'gdelt':'GDELT','google-news-rss':'Google News','configured-feed':'Preferred feed','sec-edgar':'SEC EDGAR'};
+ for(const [key,label] of Object.entries(names)){
+  if(error.includes(key+' HTTP 429'))messages.push(label+' is rate limited.');
+  else if(error.includes(key+' returned an unreadable'))messages.push(label+' returned an unreadable response.');
+  else if(error.includes(key+' temporarily unavailable'))messages.push(label+' was temporarily unavailable.');
+ }
+ if(error.includes('Assessment unavailable:'))messages.push(error.includes('used its token limit')
+  ?'The selected AI model ran out of output tokens before finishing the assessment.'
+  :'The AI assessment could not finish. You can run another scan.');
+ if(messages.length&&run.evidence?.length)messages.push('Collected sources are available below.');
+ return messages.length?messages.join(' '):error;
+}
 function assessment(r){const w=watches.find(x=>x.id===r.watch_id),c=card();c.append(el('h3',w?.name||'Watch'),el('p',(r.status==='queued'&&r.next_attempt_at?'Retry scheduled'
- :r.status==='running'&&r.stage==='investigating'?'Investigating':r.status==='running'&&r.stage==='assessment'?'Generating assessment':scanStatuses[r.status]||r.status)+' · '+new Date(r.created_at).toLocaleString()));if(r.status==='queued'&&r.next_attempt_at)c.append(el('p','Next attempt '+new Date(r.next_attempt_at).toLocaleString()));if(r.error)c.append(el('p',r.error));if(!r.assessment&&r.evidence?.length)c.append(el('p','No AI assessment available for this scan.'));if(r.assessment){const report=readStructured(r.assessment),text=report?assessmentText(report):r.assessment;const badge=el('span','✦ AI-assisted');badge.style.cssText='display:inline-block;color:#a78bfa;border:1px solid #a78bfa;border-radius:999px;padding:2px 8px;font-size:12px';c.append(el('h4','Intelligence assessment'),badge,report?structuredAssessment(report,r):formattedAssessment(r.assessment),el('p','AI interpretation of collected headlines and source metadata only.'));const links=(r.evidence||[]).filter(x=>/^https?:\/\//i.test(x.url||'')).map(x=>x.url);const body=(report?report.summary.text:text.slice(0,1200))+'\n\n'+links.slice(0,5).join('\n')+'\n'+assessmentLink(r.id);c.append(actions(button('Email assessment',()=>{location.href='mailto:'+encodeURIComponent(w?.recipients||'')+'?cc='+encodeURIComponent(w?.recipients_cc||'')+'&subject='+encodeURIComponent('News Watch | '+(w?.name||'Assessment'))+'&body='+encodeURIComponent(body)}),button('Copy assessment',()=>navigator.clipboard.writeText(text+'\n'+links.join('\n')+'\n'+assessmentLink(r.id)))));
+ :r.status==='running'&&r.stage==='investigating'?'Investigating':r.status==='running'&&r.stage==='assessment'?'Generating assessment':scanStatuses[r.status]||r.status)+' · '+new Date(r.created_at).toLocaleString()));if(r.status==='queued'&&r.next_attempt_at)c.append(el('p','Next attempt '+new Date(r.next_attempt_at).toLocaleString()));const active=['queued','running'].includes(r.status);
+ if(r.status==='queued'&&!r.next_attempt_at)c.append(el('p','Waiting for the next available scan slot.'));
+ if(!active&&r.error)c.append(el('p',scanOutcome(r)));
+ if(!active&&!r.assessment&&r.evidence?.length&&!r.error)c.append(el('p','This scan saved sources without an AI assessment.'));if(r.assessment){const report=readStructured(r.assessment),text=report?assessmentText(report):r.assessment;const badge=el('span','✦ AI-assisted');badge.style.cssText='display:inline-block;color:#a78bfa;border:1px solid #a78bfa;border-radius:999px;padding:2px 8px;font-size:12px';c.append(el('h4','Intelligence assessment'),badge,report?structuredAssessment(report,r):formattedAssessment(r.assessment),el('p','AI interpretation of collected headlines and source metadata only.'));const links=(r.evidence||[]).filter(x=>/^https?:\/\//i.test(x.url||'')).map(x=>x.url);const body=(report?report.summary.text:text.slice(0,1200))+'\n\n'+links.slice(0,5).join('\n')+'\n'+assessmentLink(r.id);c.append(actions(button('Email assessment',()=>{location.href='mailto:'+encodeURIComponent(w?.recipients||'')+'?cc='+encodeURIComponent(w?.recipients_cc||'')+'&subject='+encodeURIComponent('News Watch | '+(w?.name||'Assessment'))+'&body='+encodeURIComponent(body)}),button('Copy assessment',()=>navigator.clipboard.writeText(text+'\n'+links.join('\n')+'\n'+assessmentLink(r.id)))));
  const integrations=actions();
  if(integrationAccess.portfolio_management)integrations.append(button('Link to initiative',()=>integrationOptions('portfolio',r)));
  if(integrationAccess.work_board){const link=el('a','Draft a Work Board task');link.href=boardDraft(r);link.className='ap-btn';integrations.append(link)}

@@ -127,7 +127,9 @@ Deno.serve(async req=>{
   const sources=await db.rpc('sentinel_scan_sources',{p_run:job.id,p_started_at:job.started_at});
   if(sources.error)throw Error('Could not load administrator source lists');
   const allDomains:string[]=sources.data??[];
-  const history=await db.from('sentinel_scan_runs').select('id',{count:'exact',head:true}).eq('watch_id',job.watch_id).eq('org_id',job.org_id).lt('created_at',job.created_at);
+  const current=await db.from('sentinel_scan_runs').select('watch_id,org_id,created_at').eq('id',job.id).single();
+  if(current.error)throw Error('Could not load source rotation context');
+  const history=await db.from('sentinel_scan_runs').select('id',{count:'exact',head:true}).eq('watch_id',current.data.watch_id).eq('org_id',current.data.org_id).lt('created_at',current.data.created_at);
   if(history.error)throw Error('Could not determine source rotation');
   const batches=Math.ceil(allDomains.length/8);
   const batch=batches?(history.count??0)%batches:0;

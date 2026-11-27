@@ -55,10 +55,15 @@ export function validateReport(raw, evidenceCount) {
     implications: list(data.implications, 8, statement),
     risks: list(data.risks, 9, risk),
     opportunities: list(data.opportunities, 8, statement),
-    recommendations: list(data.recommendations, 8, item => ({
-      ...statement(item), rationale:text(item.rationale), urgency:text(item.urgency,80),
-      impact:text(item.impact), role:text(item.role,100),
-    })),
+    recommendations: list(data.recommendations, 8, item => {
+      const action = item.text ?? item.action;
+      if (typeof action !== 'string' || !action.trim()) return null;
+      return {
+        ...statement({text:action,sources:item.sources}),
+        rationale:text(item.rationale), urgency:text(item.urgency,80),
+        impact:text(item.impact), role:text(item.role,100),
+      };
+    }).filter(Boolean),
     confidence: enums(data.confidence, CONFIDENCE),
     limitations: list(data.limitations, 8, item => text(item)),
   };

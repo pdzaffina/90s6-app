@@ -35,3 +35,11 @@ test('missing claim types default conservatively and uncited summaries are omitt
   assert.equal(result.summary.text,'A cited headline was reported.');
   assert.equal(result.developments[0].kind,'reported_claim');
 });
+
+test('recommendation metadata without an action leaves the cited report available', () => {
+  const result=validateReport(JSON.stringify({...report,recommendations:[{
+    rationale:'Potential trend',urgency:'Monitor',impact:'Potential disruption',role:'Analyst',sources:[1],
+  }]}),1);
+  assert.deepEqual(result.recommendations,[]);
+  assert.equal(result.risks.length,1);
+});

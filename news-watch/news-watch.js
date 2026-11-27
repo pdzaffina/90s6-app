@@ -454,11 +454,19 @@ async function showDevelopments(){
  if(org!==scope||!panel.isConnected)return;
  if(result.error){panel.append(el('p','Developments unavailable: '+result.error.message));return}
  if(!result.data.length)panel.append(el('p','No indexed developments yet.'));
- for(const d of result.data){
+ const groups=new Map();
+ for(const d of result.data){if(!groups.has(d.watch_id))groups.set(d.watch_id,[]);groups.get(d.watch_id).push(d)}
+ for(const [watchId,developments] of [...groups].sort((a,b)=>(watches.find(w=>w.id===a[0])?.name||'').localeCompare(watches.find(w=>w.id===b[0])?.name||''))){
+ const group=el('section');group.className='nw-card';
+ const heading=el('h3',watches.find(w=>w.id===watchId)?.name||'Watch');
+ group.append(heading,el('p',developments.length+' developments'));
+ panel.append(group);
+ for(const d of developments){
   const item=el('details');item.append(el('summary',d.title),el('p', (watches.find(w=>w.id===d.watch_id)?.name||'Watch')+' · '+d.evidence_count+' evidence items · First observed '+new Date(d.first_seen_at).toLocaleDateString()+' · Latest new evidence '+new Date(d.last_seen_at).toLocaleDateString()));
   const list=el('ul');
   for(const e of d.evidence||[]){const li=el('li');try{const u=new URL(e.url);if(!['http:','https:'].includes(u.protocol))throw Error();const a=el('a',e.title||u.hostname);a.href=u.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a)}catch{li.append(el('span',e.title||'Evidence'))}li.append(el('span',' · '+(e.source||'Unknown source')));list.append(li)}
-  item.append(list);panel.append(item);
+  item.append(list);group.append(item);
+ }
  }
  if(result.data.length===100)panel.append(el('p','Showing the 100 most recently indexed developments.'));
 }

@@ -2,8 +2,11 @@ import {createClient} from 'npm:@supabase/supabase-js@2.57.0';
 import {unzipSync} from 'npm:fflate@0.8.2';
 Deno.serve(async req=>{
  const key=Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
- if(req.method!=='POST'||req.headers.get('authorization')!=='Bearer '+key)return new Response('Unauthorized',{status:401});
+ if(req.method!=='POST')return new Response('Unauthorized',{status:401});
  const db=createClient(Deno.env.get('SUPABASE_URL')!,key,{auth:{persistSession:false}});
+ const token=(await req.json().catch(()=>({}))).token;
+ if(typeof token!=='string'||!/^[a-f0-9]{64}$/.test(token))return new Response('Unauthorized',{status:401});
+ const auth=await db.rpc('sentinel_consume_token',{p_token:token});if(auth.error||auth.data!==true)return new Response('Unauthorized',{status:401});
  const claim=await db.rpc('sentinel_gdelt_claim');
  if(claim.error)return Response.json({error:claim.error.message},{status:500});
  const slot=claim.data;if(!slot)return Response.json({status:'idle'});

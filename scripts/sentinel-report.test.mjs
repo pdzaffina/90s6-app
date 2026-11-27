@@ -26,3 +26,12 @@ test('report validation refuses fabricated source numbers and unreferenced claim
     assert.throws(() => validateReport(JSON.stringify(altered), 1), /evidence reference/);
   }
 });
+
+test('missing claim types default conservatively and uncited summaries are omitted', () => {
+  const result = validateReport(JSON.stringify({...report,
+    summary:'Unsupported summary text.',
+    developments:[{text:'A cited headline was reported.',sources:[1]}],
+  }), 1);
+  assert.equal(result.summary.text,'A cited headline was reported.');
+  assert.equal(result.developments[0].kind,'reported_claim');
+});

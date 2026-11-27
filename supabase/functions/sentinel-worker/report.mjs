@@ -39,10 +39,19 @@ export function validateReport(raw, evidenceCount) {
     direction: enums(item.direction, DIRECTION),
     confidence: enums(item.confidence, CONFIDENCE),
   });
+  const developments=list(data.developments,12,item=>({
+    ...statement(item),
+    kind:item.kind==null?'reported_claim':enums(item.kind,KIND),
+  }));
+  // Some models send an uncited summary string. Use the first cited
+  // development verbatim so the report never assigns invented citations.
+  const summary=typeof data.summary==='string'&&developments.length
+    ? {text:developments[0].text,sources:developments[0].sources}
+    : statement(data.summary);
   return {
     version: 1,
-    summary: statement(data.summary),
-    developments: list(data.developments, 12, item => ({...statement(item),kind:enums(item.kind,KIND)})),
+    summary,
+    developments,
     implications: list(data.implications, 8, statement),
     risks: list(data.risks, 9, risk),
     opportunities: list(data.opportunities, 8, statement),

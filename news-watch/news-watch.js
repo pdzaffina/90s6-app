@@ -4,7 +4,7 @@ const sb=App.sb,$=id=>document.getElementById(id),view=$('nwView'),nav=$('crmNav
 const pages=['Overview','Watchlist','Intelligence','Assessments','Notifications','Scan history'];
 const scanStatuses={queued:'Queued',running:'Collecting intelligence',complete:'Complete',partial:'Partial',failed:'Failed'};
 const pageFromUrl=()=>pages.find(p=>p.toLowerCase().replace(/ /g,'-')===new URLSearchParams(location.search).get('section'))||'Overview';
-let org,user,watches=[],runs=[],page=pageFromUrl(),deepAvailable=false,integrationAccess={};
+let org,user,watches=[],runs=[],page=pageFromUrl(),deepAvailable=false,integrationAccess={},briefingAvailable=false,riskReviewAvailable=false;
 const dashboardFilters={category:'',relationship_type:'',severity:'',direction:'',period:'30',owner:''};
 window.addEventListener('popstate',()=>{page=pageFromUrl();render()});
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n};
@@ -120,13 +120,13 @@ function bulkEdit(){
  panel.append(el('h2','Update '+selectedWatches.size+' watches'),form);
  view.prepend(panel);
 }
-function formattedAssessment(value){
+function formattedAssessment(value,allowLinks=true){
  const root=el('div');root.className='nw-assessment';
  let source=String(value??'').trim();
  if(source.startsWith('"')){try{const parsed=JSON.parse(source);if(typeof parsed==='string')source=parsed}catch{}}
  source=source.replace(/^\s*\x60{3}(?:markdown|md)?\s*\n/i,'').replace(/\n\s*\x60{3}\s*$/,'');
  if(!source.includes('\n')&&source.includes('\\n'))source=source.replace(/\\n/g,'\n');
- const inline=(node,s)=>{const pattern=/(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|\x60[^\x60]+\x60)/g;for(const part of s.split(pattern)){const link=part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);if(link){const a=el('a',link[1]);a.href=link[2];a.target='_blank';a.rel='noopener noreferrer';node.append(a)}else if(/^\*\*.*\*\*$|^__.*__$/.test(part))node.append(el('strong',part.slice(2,-2)));else if(/^\*.*\*$|^_.*_$/.test(part))node.append(el('em',part.slice(1,-1)));else if(part.startsWith('\x60')&&part.endsWith('\x60'))node.append(el('code',part.slice(1,-1)));else node.append(document.createTextNode(part))}};
+ const inline=(node,s)=>{const pattern=/(\[[^\]]+\]\(https?:\/\/[^\s)]+\)|\*\*[^*]+\*\*|__[^_]+__|\*[^*]+\*|_[^_]+_|\x60[^\x60]+\x60)/g;for(const part of s.split(pattern)){const link=part.match(/^\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)$/);if(link&&!allowLinks){node.append(document.createTextNode(link[1]))}else if(link){const a=el('a',link[1]);a.href=link[2];a.target='_blank';a.rel='noopener noreferrer';node.append(a)}else if(/^\*\*.*\*\*$|^__.*__$/.test(part))node.append(el('strong',part.slice(2,-2)));else if(/^\*.*\*$|^_.*_$/.test(part))node.append(el('em',part.slice(1,-1)));else if(part.startsWith('\x60')&&part.endsWith('\x60'))node.append(el('code',part.slice(1,-1)));else node.append(document.createTextNode(part))}};
  const lines=source.split(/\r?\n/);let list=null,paragraph=null;
  const cells=s=>s.trim().replace(/^\|/,'').replace(/\|$/,'').split('|').map(x=>x.trim());
  for(let i=0;i<lines.length;i++){const line=lines[i].trim();if(!line){list=null;paragraph=null;continue}
@@ -309,7 +309,29 @@ function assessment(r){const w=watches.find(x=>x.id===r.watch_id),c=card();c.app
  if(integrationAccess.portfolio_management)integrations.append(button('Link to initiative',()=>integrationOptions('portfolio',r)));
  if(integrationAccess.work_board){const link=el('a','Draft a Work Board task');link.href=boardDraft(r);link.className='ap-btn';integrations.append(link)}
  if(integrationAccess.content_studio&&w?.shared)integrations.append(button('Draft knowledge article',()=>knowledgeDraft(r,w,text)));
- if(integrations.children.length)c.append(integrations)}if(Array.isArray(r.evidence)&&r.evidence.length){const list=el('ul');for(const [index,item] of r.evidence.entries()){try{const url=new URL(item.url);if(!['https:','http:'].includes(url.protocol))continue;const li=el('li'),a=el('a',item.title||url.hostname);li.id='source-'+r.id+'-'+(index+1);a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a);const provenance=[item.source,item.published&&new Date(item.published).toLocaleDateString(),typeof item.new_development==='boolean'?(item.new_development?'Newly collected':'Previously collected'):null].filter(Boolean);if(provenance.length)li.append(el('p',provenance.join(' · ')));if(item.description)li.append(el('p',item.description));list.append(li)}catch{}}c.append(el('h4','Source evidence'),list)}return c}
+ if(integrations.children.length)c.append(integrations);
+ if(riskReviewAvailable)c.append(aiReportButton('Review risk with AI','sentinel_risk_classification',[r.id]))}if(Array.isArray(r.evidence)&&r.evidence.length){const list=el('ul');for(const [index,item] of r.evidence.entries()){try{const url=new URL(item.url);if(!['https:','http:'].includes(url.protocol))continue;const li=el('li'),a=el('a',item.title||url.hostname);li.id='source-'+r.id+'-'+(index+1);a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a);const provenance=[item.source,item.published&&new Date(item.published).toLocaleDateString(),typeof item.new_development==='boolean'?(item.new_development?'Newly collected':'Previously collected'):null].filter(Boolean);if(provenance.length)li.append(el('p',provenance.join(' · ')));if(item.description)li.append(el('p',item.description));list.append(li)}catch{}}c.append(el('h4','Source evidence'),list)}return c}
+function aiReportButton(label,component,runIds){
+ const panel=el('div'),output=el('div');
+ output.setAttribute('aria-live','polite');
+ const launch=button(label,async()=>{
+  output.replaceChildren(el('p','Generating…'));
+  try{
+   const response=await sb.functions.invoke('ai-platform-gateway',{body:{tenant_id:org,component,run_ids:runIds}});
+   if(response.error||!response.data?.content)throw Error('No response');
+   const badge=el('span','✦ AI-assisted');badge.className='nw-ai-badge';
+   const list=el('ol');
+   for(const id of response.data.assessment_ids||[]){
+    const item=el('li'),link=el('a','Assessment '+(list.children.length+1));
+    link.href=assessmentLink(id);item.append(link);list.append(item);
+   }
+   output.replaceChildren(badge,formattedAssessment(response.data.content,false),list);
+  }catch{output.replaceChildren(el('p','The AI response could not finish. Try again.'))}
+ });
+ launch.classList.add('nw-ai-action');
+ panel.append(launch,output);
+ return panel;
+}
 function dashboard(){
  const root=el('section'),filterBar=actions(),reportArea=el('div');
  root.append(filterBar,reportArea);
@@ -375,6 +397,10 @@ function dashboard(){
   }
   recent.append(list.children.length?list:el('p','No matching assessments.'));
   reportArea.replaceChildren(metrics,counts,categories,trends,recent);
+  if(briefingAvailable&&visible.length){
+   const briefing=card();briefing.append(el('h3','Executive briefing'),aiReportButton('Generate briefing','sentinel_briefing',visible.slice(0,8).map(({run})=>run.id)));
+   reportArea.append(briefing);
+  }
   if(runs.length>=200)reportArea.append(el('p','Metrics reflect the 200 most recent accessible scans.'));
  }
  update();
@@ -448,6 +474,11 @@ App.onSession(async(s,p)=>{
   return [key,!result.error&&result.data===true];
  }));
  integrationAccess=Object.fromEntries(integrations);
+ const [briefing,riskReview]=await Promise.all(['sentinel_briefing','sentinel_risk_classification'].map(component=>
+  sb.rpc('ai_platform_authorized',{p_tenant:org,p_component:component})
+ ));
+ briefingAvailable=!briefing.error&&briefing.data===true;
+ riskReviewAvailable=!riskReview.error&&riskReview.data===true;
  try{await load()}catch(e){status(e.message);return}
  refreshTimer=setInterval(()=>refreshPendingScans().catch(()=>status('Scan status could not refresh. Try Refresh.')),15000);
 });

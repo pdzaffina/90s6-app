@@ -47,12 +47,12 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
 | 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Collection and assessment stages and Global Admin operations panel added. Investigation stage and scheduled and cross-tenant end-to-end tests pending. |
 | 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. SEC EDGAR adapter and CIK watch field added. Production preferred-feed and SEC verification, expanded entity context, source verification, and syndicated-content grouping pending. |
-| 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Bounded deep planning and follow-up share the existing AI budget and audit. Independent risk-classification and briefing features and deep mobile verification pending. |
+| 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Bounded deep planning and follow-up share the existing AI budget and audit. Independent advisory risk review and executive briefing use the shared AI gateway. Deep and executive mobile verification pending. |
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
 | 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
 | 6 | CRM and Portfolio link records, Work Board task drafting, and Knowledge Base drafts added through existing authorization. Action Inbox and end-to-end integration checks pending. |
 | 7 | CSV/XLSX preview, interactive mapping, validation, duplicate skip/update, defaults, selected-watch management, audit, and throttled initial scans implemented. Optional AI enrichment pending. |
-| 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive AI briefing and broader history aggregation pending. |
+| 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive briefing added using the eight most recent matching assessments. Broader history aggregation pending. |
 
 ### Queue operations and rollback
 
@@ -121,3 +121,7 @@ Authorized Work Board editors can open a task draft from an accessible assessmen
 ### Assessment output budget
 
 The 2026-11-27 Aristocrat Interactive scan saved nine sources. The model used all 4,096 configured completion tokens for reasoning before producing report content. The runtime now supplies a model-specific reasoning budget for Nemotron Lightning while preserving the configured model and total output-token limit. Scan History shows a pending assessment as in progress and reserves failure text for terminal or retry states.
+
+### Executive briefings and advisory risk review
+
+The executive overview can request a briefing for up to eight matching assessments. A single assessment supports a separate AI risk review. Global AI Admin controls both components. The common AI gateway re-reads the requested source records on the signed-in user's session and organization, and reserves the existing AI usage budget. The results remain advisory and link to the source assessments. Disable the components to hide the actions and reject requests, or redeploy the previous gateway if a rollback is needed.

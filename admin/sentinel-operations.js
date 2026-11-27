@@ -34,7 +34,7 @@
     const providers = document.createElement('ul');
     for (const provider of data.providers) {
       const item = document.createElement('li');
-      const name = provider.provider === 'gdelt' ? 'GDELT' : 'Google News RSS';
+      const name = ({gdelt:'GDELT','google-news-rss':'Google News RSS','configured-feed':'Preferred feed'})[provider.provider] || provider.provider;
       const lastStatus = provider.last_status === 0 ? 'Request failed'
         : provider.last_status ? 'HTTP ' + provider.last_status : 'Awaiting response history';
       item.textContent = [name, lastStatus, timestamp(provider.observed_at),

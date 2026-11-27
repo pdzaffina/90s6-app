@@ -46,7 +46,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | --- | --- |
 | 0 | Main, production schema and migrations, Cron, assessment counts, and local test baseline inspected. Full deployed-source and log comparison pending. |
 | 1 | Queue eligibility checks, tenant-aware ordering, immediate manual dispatch, pending scan refresh. Shared provider throttling, deferred retries, and lease recovery added. Collection and assessment stages and Global Admin operations panel added. Investigation stage and scheduled and cross-tenant end-to-end tests pending. |
-| 2 | Existing Google News RSS and GDELT fallback. Modular providers, watch configuration, SEC, configured feeds, and cross-scan normalization pending. |
+| 2 | GDELT, Google News RSS fallback, configurable RSS/Atom, query terms, lookback, and watch-scoped canonical evidence implemented. Production preferred-feed verification, SEC, expanded entity context, source verification, and syndicated-content grouping pending. |
 | 3 | Existing single governed assessment and Markdown renderer. Bounded investigation, structured citations, independent AI features, and model and mobile verification pending. |
 | 4 | Existing per-run assessment history. Structured risk and longitudinal comparison pending. |
 | 5 | Existing manual email and copy. Threshold alerts, digests, preferences, acknowledgment, and assessment deep links pending. |
@@ -75,3 +75,11 @@ Global Admin → Sentinel operations shows queue depth, oldest pending scan, rec
 After deploying the retry-capable worker, a production manual scan began in 0.35 seconds and stored eight sources with a governed AI assessment. GDELT was unavailable and the scan correctly finished Partial using Google News RSS. A second submission while that scan was active returned no duplicate run, and a transaction-scoped cooldown check denied a GDELT slot during the cooldown.
 
 The operations migration is additive. Reverting the related UI commit hides the panel. The preceding worker version runs without provider result logging. Keep the restricted metrics RPC and columns in place during a frontend or worker rollback.
+
+### Provider interfaces and evidence
+
+Providers return bounded normalized evidence for a watch. GDELT and Google News use the watch name, up to three comma-separated alternate names, required and excluded terms, and lookback days. A watch can also have one preferred RSS or Atom feed. Global operations may authorize trusted feed hostnames with the Edge Function setting `SENTINEL_FEED_HOSTS`. The worker requires an exact approved HTTPS hostname, excludes credentialed URLs and nonstandard ports, rejects redirects and XML external-entity declarations, and limits response size. Use the final feed URL when approving a feed. Corporate or investor-relations feeds must be approved individually before they can provide coverage.
+
+The private evidence table is keyed by organization, watch, and a SHA-256 fingerprint of the canonical URL. The checkpoint preserves the first observation while retaining run-level evidence and visible recently collected versus previously collected labels. URLs and publication timestamps are normalized, and attribution is retained. Historical pre-index assessments and evidence remain readable. A URL match identifies previously indexed evidence for that watch. Cross-publisher syndication and coverage before indexing are outside that measure.
+
+The evidence migration is additive. To roll back the provider changes, deploy the preceding worker and revert the matching UI changes. Retain indexed evidence and watch configuration columns. Keep the service-only checkpoint and context RPCs available for any in-flight invocation.

@@ -1,6 +1,26 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.57.0';
 import { isTransientStatus, MAX_ATTEMPTS, retryAfterSeconds, retryDelay } from './retry.mjs';
 
+import { allowedFeedUrl, normalizeEvidence, parseFeed, watchQuery } from './evidence.mjs';
+
+async function boundedBody(response:Response, maxBytes=1_000_000){
+ const reader=response.body?.getReader();
+ if(!reader)throw new Error('Provider response was empty');
+ const decoder=new TextDecoder();
+ let text='', bytes=0;
+ try{
+  while(true){
+   const chunk=await reader.read();
+   if(chunk.done)return text+decoder.decode();
+   bytes+=chunk.value.byteLength;
+   if(bytes>maxBytes)throw new Error('Provider response exceeded the size limit');
+   text+=decoder.decode(chunk.value,{stream:true});
+  }
+ }finally{
+  await reader.cancel().catch(()=>{});
+ }
+}
+
 class ProviderError extends Error {
  constructor(message: string, readonly transient: boolean, readonly retryAfter = 0) {
   super(message);
@@ -41,45 +61,83 @@ Deno.serve(async req=>{
   }
   throw new ProviderError(provider+' HTTP '+response.status,isTransientStatus(response.status),delay);
  };
- let evidence:unknown[]=[],status='complete',error=null;
+ const config=await db.rpc('sentinel_watch_context',{p_run:job.id,p_started_at:job.started_at});
+ if(config.error||!config.data){
+  return await save({status:'failed',error:'The watch is no longer available.',finished_at:new Date().toISOString()})
+   ?? reply({status:'failed'});
+ }
+ const context=config.data;
+ let query:string;
+ try{query=watchQuery(job.name,context);}
+ catch{
+  return await save({status:'failed',error:'The watch needs a searchable name.',finished_at:new Date().toISOString()})
+   ?? reply({status:'failed'});
+ }
+ const lookback=Number(context.lookback_days)||7;
+ let evidence:ReturnType<typeof normalizeEvidence>=[],status='complete',error:string|null=null;
+ let failures:unknown[]=[];
+ const rss=async(u:URL,provider:string,sourceClass:string)=>{
+  const r=await providerFetch(provider,u,{Accept:'application/rss+xml, application/atom+xml, application/xml, text/xml'});
+  return normalizeEvidence(parseFeed(await boundedBody(r),u.href),provider,sourceClass);
+ };
+ const google=async()=>{
+  const u=new URL('https://news.google.com/rss/search');
+  for(const [k,v] of Object.entries({q:query+' when:'+lookback+'d',hl:'en-US',gl:'US',ceid:'US:en'}))u.searchParams.set(k,v);
+  return rss(u,'google-news-rss','other');
+ };
+ const gdelt=async()=>{
+  const u=new URL('https://api.gdeltproject.org/api/v2/doc/doc');
+  for(const [k,v] of Object.entries({query,mode:'artlist',format:'json',maxrecords:'30',timespan:lookback+'d',sort:'datedesc'}))u.searchParams.set(k,v);
+  const r=await providerFetch('gdelt',u);
+  const data=JSON.parse(await boundedBody(r));
+  if(!Array.isArray(data.articles))throw Error('Invalid GDELT response');
+  return normalizeEvidence(data.articles.map((a:any)=>({...a,published:a.seendate,source:a.domain})),'gdelt','other');
+ };
+ let coverage=false;
  try{
- const name=String(job.name).replace(/[^\p{L}\p{N}\s.-]/gu,' ').trim().slice(0,200);
- if(!name)throw Error('Empty query');
- const seen=new Set<string>();
- const decode=(s:string)=>s.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g,'$1').replace(/&(#x[0-9a-f]+|#\d+|amp|lt|gt|quot|apos);/gi,(m,k)=>{const n=k[0]==='#'?(k[1].toLowerCase()==='x'?parseInt(k.slice(2),16):parseInt(k.slice(1),10)):0;return k[0]==='#'?(n>0&&n<=0x10ffff?String.fromCodePoint(n):m):({amp:'&',lt:'<',gt:'>',quot:'"',apos:"'"} as Record<string,string>)[k]||m});
- const field=(s:string,k:string)=>decode(s.match(new RegExp('<'+k+'(?:\\s[^>]*)?>([\\s\\S]*?)</'+k+'>','i'))?.[1]||'').trim();
- const normalize=(articles:any[],provider:string)=>articles.slice(0,30).flatMap(a=>{try{const u=new URL(a.url);if(!['http:','https:'].includes(u.protocol)||u.username||u.password)return [];u.hash='';for(const k of [...u.searchParams.keys()])if(k.startsWith('utm_'))u.searchParams.delete(k);if(seen.has(u.href))return [];seen.add(u.href);return [{url:u.href,title:String(a.title||'').slice(0,300),description:'',published:a.published||null,source:String(a.source||u.hostname).slice(0,200),provider}]}catch{return []}});
- const rss=async()=>{const u=new URL('https://news.google.com/rss/search');for(const [k,v] of Object.entries({q:'"'+name+'" when:7d',hl:'en-US',gl:'US',ceid:'US:en'}))u.searchParams.set(k,v);
- const r=await providerFetch('google-news-rss',u,{Accept:'application/rss+xml, application/xml, text/xml'});
- const xml=await r.text();if(!/<rss[\s>]/i.test(xml)||!/<channel[\s>]/i.test(xml))throw Error('Invalid Google News RSS response');
- return normalize([...xml.matchAll(/<item(?:\s[^>]*)?>([\s\S]*?)<\/item>/gi)].map(m=>{const s=m[1],d=new Date(field(s,'pubDate'));return {url:field(s,'link'),title:field(s,'title'),source:field(s,'source'),published:Number.isNaN(d.getTime())?null:d.toISOString()}}),'google-news-rss');};
- const gdelt=async()=>{const u=new URL('https://api.gdeltproject.org/api/v2/doc/doc');for(const [k,v] of Object.entries({query:'"'+name+'"',mode:'artlist',format:'json',maxrecords:'30',timespan:'7d',sort:'datedesc'}))u.searchParams.set(k,v);
- const r=await providerFetch('gdelt',u);const data=await r.json();if(!Array.isArray(data.articles))throw Error('Invalid GDELT response');return normalize(data.articles.map((a:any)=>({...a,published:a.seendate})),'gdelt');};
- try{evidence=await gdelt();}
- catch(primary){
+  evidence=await gdelt();
+  coverage=true;
+ }catch(primary){
+  failures.push(primary);
   try{
-   evidence=await rss();
-   status='partial';
-   error='Primary collection unavailable. Using Google News RSS coverage.';
+   evidence=await google();
+   coverage=true;
   }catch(secondary){
-   const failures=[primary,secondary].filter((cause):cause is ProviderError=>cause instanceof ProviderError);
-   throw new ProviderError(failures.map(cause=>cause.message).join('; ')||'Providers returned invalid data',
-    failures.some(cause=>cause.transient),Math.max(0,...failures.map(cause=>cause.retryAfter)));
+   failures.push(secondary);
   }
  }
-
- }catch(e){
-  status='failed';
-  error=e instanceof Error?e.message:'Search failed';
-  if(e instanceof ProviderError&&e.transient&&job.attempt<MAX_ATTEMPTS){
-   const next_attempt_at=new Date(Date.now()+1000*retryDelay(job.attempt,e.retryAfter)).toISOString();
+ if(context.feed_url){
+  try{
+   const hosts=new Set((Deno.env.get('SENTINEL_FEED_HOSTS')||'').toLowerCase().split(',').map(host=>host.trim()).filter(Boolean));
+   const url=allowedFeedUrl(context.feed_url,hosts);
+   if(!url)throw new ProviderError('Preferred feed domain is unavailable. Ask an administrator to approve it.',false);
+   const sourceItems=await rss(url,'configured-feed','other');
+   const earliest=Date.now()-lookback*86400000;
+   const urls=new Set(evidence.map(item=>item.url));
+   evidence.push(...sourceItems.filter(item=>!urls.has(item.url)&&(!item.published||Date.parse(item.published)>=earliest)));
+   coverage=true;
+  }catch(failure){
+   failures.push(failure);
+  }
+ }
+ if(failures.length){
+  const typed=failures.filter((cause):cause is ProviderError=>cause instanceof ProviderError);
+  status=coverage?'partial':'failed';
+  error=failures.map(cause=>cause instanceof ProviderError?cause.message:'Provider returned invalid data').join('; ');
+  if(!coverage&&typed.some(cause=>cause.transient)&&job.attempt<MAX_ATTEMPTS){
+   const next_attempt_at=new Date(Date.now()+1000*retryDelay(job.attempt,Math.max(0,...typed.map(cause=>cause.retryAfter)))).toISOString();
    return await save({status:'queued',next_attempt_at,error}) ?? reply({status:'retry-scheduled'});
   }
  }
  let assessment:string|null=null;
  if(status!=='failed'&&evidence.length){
- const checkpoint=await save({evidence,error});
- if(checkpoint)return checkpoint;
+ const checkpoint=await db.rpc('sentinel_checkpoint_evidence',{
+  p_run:job.id,p_started_at:job.started_at,p_evidence:evidence.slice(0,45),p_error:error
+ });
+ if(checkpoint.error)return await save({evidence,status:'partial',error:'Evidence indexing is unavailable.',finished_at:new Date().toISOString()})
+  ?? reply({status:'partial',count:evidence.length});
+ if(!checkpoint.data)return reply({status:'lease-lost'},409);
+ evidence=checkpoint.data;
  let usage:string|null=null, input=0,output=0,cost=0,billed=false;
  try{
  const apiKey=Deno.env.get('AINBOX_LLM_API_KEY'),base=(Deno.env.get('AINBOX_LLM_BASE_URL')||'https://integrate.api.nvidia.com/v1').replace(/\/+$/,'');
@@ -89,7 +147,7 @@ Deno.serve(async req=>{
  const cfg=reservation.data;
  if(cfg){
  usage=cfg.usage_id;
- const response=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(cfg.payload),signal:AbortSignal.timeout(Math.min(85000,Math.max(5000,Number(cfg.timeout_ms)||20000)))});
+ const response=await fetch(base+'/chat/completions',{method:'POST',headers:{Authorization:'Bearer '+apiKey,'Content-Type':'application/json'},body:JSON.stringify(cfg.payload),signal:AbortSignal.timeout(Math.min(65000,Math.max(5000,Number(cfg.timeout_ms)||20000)))});
  const data=await response.json();
  input=Number(data?.usage?.prompt_tokens)||0;output=Number(data?.usage?.completion_tokens)||0;cost=(input*Number(cfg.input_rate)+output*Number(cfg.output_rate))/1000000;billed=response.ok;
  const audit=await db.from('ainbox_ai_request_audit').update({response_payload:data,response_at:new Date().toISOString(),http_status:response.status,provider_request_id:response.headers.get('x-request-id'),input_tokens:input,output_tokens:output,estimated_usd:cost,error_message:response.ok?null:'Provider HTTP '+response.status}).eq('usage_id',usage);

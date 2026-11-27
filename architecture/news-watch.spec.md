@@ -51,7 +51,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
 | 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
 | 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
-| 7 | Existing CSV import with basic duplicate detection. Native XLSX, mapping, and bulk management pending. |
+| 7 | CSV/XLSX preview, interactive mapping, validation, duplicate skip/update, defaults, selected-watch management, audit, and throttled initial scans implemented. Optional AI enrichment pending. |
 | 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive AI briefing and broader history aggregation pending. |
 
 ### Queue operations and rollback
@@ -107,3 +107,7 @@ An authorized watch owner can start a deep investigation when both Investigation
 Watch settings bound deep investigation to one or two rounds, one to three search requests, and a minimum model-estimated relevance threshold. Search proposals must be short topics. The worker combines each with the watch query and submits it only to the built-in Google News search endpoint. Evidence from initial collection remains indexed if follow-up searches time out. The final report cites evidence from the combined set. The worker uses deterministic query orchestration and does not depend on native tool-calling support.
 
 To disable deep work, turn off Sentinel Investigation Planning in Global AI Admin. Standard scans and existing reports remain available. A worker rollback may preserve the additional columns and settings.
+
+### Bulk watch management
+
+Use Watchlist → Bulk import to map CSV or first-sheet XLSX columns, preview validation, choose per-import defaults, and skip or update owned duplicates. The server applies eligible rows in one transaction and audits counts. Optional initial scans are inserted into the existing queue for Cron processing. XLSX uses the pinned ExcelJS 4.4.0 MIT-licensed browser build with an integrity hash. Workbooks require literal values, are limited to 2 MB before parsing, and are checked for archive size and entry count. Store vendor IDs with leading zeros as text. The selected-watch editor changes category, activation, schedule, and email recipients subject to ownership and organization access.

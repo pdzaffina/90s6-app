@@ -3,7 +3,7 @@
   const form = panel.querySelector('form');
   const list = panel.querySelector('textarea');
   const feedback = panel.querySelector('[role="status"]');
-  const submit = panel.querySelector('button');
+  const submit = form.querySelector('button[type="submit"]');
   const organization = panel.dataset.scope === 'organization';
   let org, limit=250;
   const limitInput=panel.querySelector('#sentinelSourceLimit');
@@ -41,7 +41,14 @@
     event.preventDefault();
     submit.disabled = true;
     try {
-      const domains = [...new Set(list.value.split(/[,\r\n]+/).map(value => value.trim()).filter(Boolean).map(normalize))];
+      const entries=list.value.split(/[,;\r\n]+/).map(value=>value.trim()).filter(Boolean);
+      const valid=[],invalid=[];
+      for(const entry of entries){
+        try{valid.push(normalize(entry.replace(/^\s*(?:[-*•]|\d+[.)])\s+/,'').replace(/^<|>$/g,'')));}
+        catch{invalid.push(entry);}
+      }
+      if(invalid.length)throw new Error('Invalid source'+(invalid.length===1?'':'s')+': '+invalid.slice(0,5).join('; ')+(invalid.length>5?' (and '+(invalid.length-5)+' more)':'')+'. Correct these entries and save again.');
+      const domains=[...new Set(valid)];
       if (domains.length > limit) throw new Error('Enter up to '+limit+' unique domains.');
       const {data,error} = await App.sb.rpc('sentinel_admin_sources', {p_org:org,p_domains:domains});
       if (error) throw error;
@@ -73,7 +80,7 @@
     if(limitInput)limitInput.value=limit;
     const {data,error} = await App.sb.rpc('sentinel_admin_sources', {p_org:org});
     if (error) {
-      feedback.textContent = 'Sources could not load.';
+      feedback.textContent = 'Sources could not load: '+error.message;
       count.textContent='Saved sources unavailable.';
       return;
     }

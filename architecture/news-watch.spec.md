@@ -50,7 +50,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Bounded deep planning and follow-up share the existing AI budget and audit. Independent risk-classification and briefing features and deep mobile verification pending. |
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
 | 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
-| 6 | Existing application registry and access controls. Integration implementation and permissions tests pending. |
+| 6 | CRM and Portfolio link records, Work Board task drafting, and Knowledge Base drafts added through existing authorization. Action Inbox and end-to-end integration checks pending. |
 | 7 | CSV/XLSX preview, interactive mapping, validation, duplicate skip/update, defaults, selected-watch management, audit, and throttled initial scans implemented. Optional AI enrichment pending. |
 | 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive AI briefing and broader history aggregation pending. |
 
@@ -111,3 +111,9 @@ To disable deep work, turn off Sentinel Investigation Planning in Global AI Admi
 ### Bulk watch management
 
 Use Watchlist → Bulk import to map CSV or first-sheet XLSX columns, preview validation, choose per-import defaults, and skip or update owned duplicates. The server applies eligible rows in one transaction and audits counts. Optional initial scans are inserted into the existing queue for Cron processing. XLSX uses the pinned ExcelJS 4.4.0 MIT-licensed browser build with an integrity hash. Workbooks require literal values, are limited to 2 MB before parsing, and are checked for archive size and entry count. Store vendor IDs with leading zeros as text. The selected-watch editor changes category, activation, schedule, and email recipients subject to ownership and organization access.
+
+### Cross-application links
+
+News Watch can link a watch to an accessible CRM account and a specific assessment to an accessible portfolio initiative. Link creation requires target editor permission. The source watch and destination must remain accessible in the same organization to see the link. CRM and Portfolio show linked reports and their risk severity and confidence. Link creation does not update relationship health or portfolio ordering.
+
+Authorized Work Board editors can open a task draft from an accessible assessment. The task body has an authenticated link and a generic recommendation to review it. Board save and concurrency behavior continue to use the existing editor. For a shared watch, Content Studio creators can make a Knowledge Base draft with attribution and references, and review it through the usual publication workflow.

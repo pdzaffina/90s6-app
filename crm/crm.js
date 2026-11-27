@@ -52,7 +52,9 @@ function render(){
  for(const r of rows){const item=node('div','crm-item');const left=node('div');
  left.append(node('strong','',r.name||r.full_name||r.title||r.subject||r.description||r.dimension||'Feedback'));
  const detail=[r.stage,r.status,r.kind,r.due_date,r.account_id&&titleOf('accounts',r.account_id)].filter(Boolean).map(pretty).join(' · ');
- left.append(node('div','crm-muted',detail));item.append(left);
+ left.append(node('div','crm-muted',detail));
+ if(page==='accounts'&&App.hasFeature('news_watch'))left.append(SentinelLinks.control('account_id',r.id));
+ item.append(left);
  if(canEdit){const edit=node('button','','Edit');edit.type='button';edit.onclick=()=>openForm(page,r);item.append(edit);}
  body.append(item);}}
  search.oninput=draw;draw();

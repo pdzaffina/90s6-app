@@ -4,7 +4,7 @@ const sb=App.sb,$=id=>document.getElementById(id),view=$('nwView'),nav=$('crmNav
 const pages=['Overview','Watchlist','Intelligence','Assessments','Notifications','Scan history'];
 const scanStatuses={queued:'Queued',running:'Collecting intelligence',complete:'Complete',partial:'Partial',failed:'Failed'};
 const pageFromUrl=()=>pages.find(p=>p.toLowerCase().replace(/ /g,'-')===new URLSearchParams(location.search).get('section'))||'Overview';
-let org,user,watches=[],runs=[],page=pageFromUrl(),deepAvailable=false;
+let org,user,watches=[],runs=[],page=pageFromUrl(),deepAvailable=false,integrationAccess={};
 const dashboardFilters={category:'',relationship_type:'',severity:'',direction:'',period:'30',owner:''};
 window.addEventListener('popstate',()=>{page=pageFromUrl();render()});
 const el=(tag,text)=>{const n=document.createElement(tag);if(text!==undefined)n.textContent=text;return n};
@@ -214,8 +214,84 @@ function assessmentLink(id){
  url.searchParams.set('assessment',id);
  return url.href;
 }
+function integrationOptions(kind,source){
+ const panel=card();
+ const crm=kind==='crm';
+ panel.append(el('h3',crm?'Link to a relationship':'Link to an initiative'));
+ const prompt=el('p','Loading available records…');panel.append(prompt);
+ view.prepend(panel);
+ void (async()=>{
+  try{
+   let records;
+   if(crm){
+    const response=await sb.from('crm_accounts').select('id,name').eq('org_id',org).order('name').limit(200);
+    if(response.error)throw response.error;
+    records=response.data;
+   }else{
+    const portfolios=await sb.from('pm_portfolios').select('id').eq('tenant_id',org).limit(50);
+    if(portfolios.error)throw portfolios.error;
+    if(!portfolios.data.length)records=[];
+    else{
+     const response=await sb.from('pm_initiatives').select('id,title').in('portfolio_id',portfolios.data.map(row=>row.id)).order('title').limit(200);
+     if(response.error)throw response.error;
+     records=response.data;
+    }
+   }
+   prompt.remove();
+   if(!records.length){panel.append(el('p','No accessible records to link.'),button('Close',()=>panel.remove()));return}
+   const select=selectOptions(records.map(row=>[row.id,row.name||row.title]));
+   const existing=await sb.from('sentinel_links').select('id,account_id,initiative_id,created_by')
+    .eq('org_id',org).eq(crm?'watch_id':'run_id',source.id).not(crm?'account_id':'initiative_id','is',null);
+   if(existing.error)throw existing.error;
+   const labels=new Map(records.map(row=>[row.id,row.name||row.title]));
+   for(const link of existing.data){
+    const name=labels.get(link.account_id||link.initiative_id);
+    if(!name)continue;
+    const row=el('p','Linked to '+name);
+    if(link.created_by===user)row.append(' ',button('Remove link',async()=>{
+     const response=await sb.from('sentinel_links').delete().eq('id',link.id);
+     if(response.error)throw response.error;row.remove();
+    }));
+    panel.append(row);
+   }
+   panel.append(control(crm?'Relationship':'Initiative',select),actions(button('Close',()=>panel.remove()),button('Link',async()=>{
+    const linked=await sb.from('sentinel_links').insert(crm
+     ?{org_id:org,watch_id:source.id,account_id:select.value}
+     :{org_id:org,watch_id:source.watch_id,run_id:source.id,initiative_id:select.value});
+    if(linked.error)throw linked.error;
+    panel.remove();status('Link added');
+   })));
+  }catch{prompt.textContent='Records could not load.';panel.append(button('Close',()=>panel.remove()))}
+ })();
+}
+function boardDraft(run){
+ const url=new URL('/work-board/',location.origin);
+ url.searchParams.set('sentinel',run.id);
+ return url.href;
+}
+async function knowledgeDraft(run,watch,text){
+ if(!watch?.shared)return status('Share this watch with the organization before publishing an assessment.');
+ const panel=card();
+ panel.append(el('h3','Create a Knowledge Base draft'),el('p','Review the assessment and publish it from Content Studio when it is ready.'));
+ const safeText=text.replace(/\u0000/g,'');
+ const sources=(run.evidence||[]).slice(0,20).map((item,i)=>'['+(i+1)+'] '+item.url);
+ panel.append(actions(button('Cancel',()=>panel.remove()),button('Create draft',async()=>{
+  const result=await sb.from('knowledge_articles').insert({
+   title:'Intelligence assessment for '+watch.name,category:'External intelligence',summary:(readStructured(run.assessment)?.summary.text||watch.name).slice(0,500),
+   body:safeText+'\n\n## Sources\n'+sources.join('\n')+'\n\n'+assessmentLink(run.id),
+   status:'draft',tenant_id:org,content_scope:'tenant',created_by:user
+  });
+  if(result.error)throw result.error;panel.remove();status('Draft created in Content Studio.');
+ })));
+ view.prepend(panel);
+}
 function assessment(r){const w=watches.find(x=>x.id===r.watch_id),c=card();c.append(el('h3',w?.name||'Watch'),el('p',(r.status==='queued'&&r.next_attempt_at?'Retry scheduled'
- :r.status==='running'&&r.stage==='investigating'?'Investigating':r.status==='running'&&r.stage==='assessment'?'Generating assessment':scanStatuses[r.status]||r.status)+' · '+new Date(r.created_at).toLocaleString()));if(r.status==='queued'&&r.next_attempt_at)c.append(el('p','Next attempt '+new Date(r.next_attempt_at).toLocaleString()));if(r.error)c.append(el('p',r.error));if(!r.assessment&&r.evidence?.length)c.append(el('p','No AI assessment available for this scan.'));if(r.assessment){const report=readStructured(r.assessment),text=report?assessmentText(report):r.assessment;const badge=el('span','✦ AI-assisted');badge.style.cssText='display:inline-block;color:#a78bfa;border:1px solid #a78bfa;border-radius:999px;padding:2px 8px;font-size:12px';c.append(el('h4','Intelligence assessment'),badge,report?structuredAssessment(report,r):formattedAssessment(r.assessment),el('p','AI interpretation of collected headlines and source metadata only.'));const links=(r.evidence||[]).filter(x=>/^https?:\/\//i.test(x.url||'')).map(x=>x.url);const body=(report?report.summary.text:text.slice(0,1200))+'\n\n'+links.slice(0,5).join('\n')+'\n'+assessmentLink(r.id);c.append(actions(button('Email assessment',()=>{location.href='mailto:'+encodeURIComponent(w?.recipients||'')+'?cc='+encodeURIComponent(w?.recipients_cc||'')+'&subject='+encodeURIComponent('News Watch | '+(w?.name||'Assessment'))+'&body='+encodeURIComponent(body)}),button('Copy assessment',()=>navigator.clipboard.writeText(text+'\n'+links.join('\n')+'\n'+assessmentLink(r.id)))))}if(Array.isArray(r.evidence)&&r.evidence.length){const list=el('ul');for(const [index,item] of r.evidence.entries()){try{const url=new URL(item.url);if(!['https:','http:'].includes(url.protocol))continue;const li=el('li'),a=el('a',item.title||url.hostname);li.id='source-'+r.id+'-'+(index+1);a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a);const provenance=[item.source,item.published&&new Date(item.published).toLocaleDateString(),typeof item.new_development==='boolean'?(item.new_development?'Newly collected':'Previously collected'):null].filter(Boolean);if(provenance.length)li.append(el('p',provenance.join(' · ')));if(item.description)li.append(el('p',item.description));list.append(li)}catch{}}c.append(el('h4','Source evidence'),list)}return c}
+ :r.status==='running'&&r.stage==='investigating'?'Investigating':r.status==='running'&&r.stage==='assessment'?'Generating assessment':scanStatuses[r.status]||r.status)+' · '+new Date(r.created_at).toLocaleString()));if(r.status==='queued'&&r.next_attempt_at)c.append(el('p','Next attempt '+new Date(r.next_attempt_at).toLocaleString()));if(r.error)c.append(el('p',r.error));if(!r.assessment&&r.evidence?.length)c.append(el('p','No AI assessment available for this scan.'));if(r.assessment){const report=readStructured(r.assessment),text=report?assessmentText(report):r.assessment;const badge=el('span','✦ AI-assisted');badge.style.cssText='display:inline-block;color:#a78bfa;border:1px solid #a78bfa;border-radius:999px;padding:2px 8px;font-size:12px';c.append(el('h4','Intelligence assessment'),badge,report?structuredAssessment(report,r):formattedAssessment(r.assessment),el('p','AI interpretation of collected headlines and source metadata only.'));const links=(r.evidence||[]).filter(x=>/^https?:\/\//i.test(x.url||'')).map(x=>x.url);const body=(report?report.summary.text:text.slice(0,1200))+'\n\n'+links.slice(0,5).join('\n')+'\n'+assessmentLink(r.id);c.append(actions(button('Email assessment',()=>{location.href='mailto:'+encodeURIComponent(w?.recipients||'')+'?cc='+encodeURIComponent(w?.recipients_cc||'')+'&subject='+encodeURIComponent('News Watch | '+(w?.name||'Assessment'))+'&body='+encodeURIComponent(body)}),button('Copy assessment',()=>navigator.clipboard.writeText(text+'\n'+links.join('\n')+'\n'+assessmentLink(r.id)))));
+ const integrations=actions();
+ if(integrationAccess.portfolio_management)integrations.append(button('Link to initiative',()=>integrationOptions('portfolio',r)));
+ if(integrationAccess.work_board){const link=el('a','Draft a Work Board task');link.href=boardDraft(r);link.className='ap-btn';integrations.append(link)}
+ if(integrationAccess.content_studio&&w?.shared)integrations.append(button('Draft knowledge article',()=>knowledgeDraft(r,w,text)));
+ if(integrations.children.length)c.append(integrations)}if(Array.isArray(r.evidence)&&r.evidence.length){const list=el('ul');for(const [index,item] of r.evidence.entries()){try{const url=new URL(item.url);if(!['https:','http:'].includes(url.protocol))continue;const li=el('li'),a=el('a',item.title||url.hostname);li.id='source-'+r.id+'-'+(index+1);a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';li.append(a);const provenance=[item.source,item.published&&new Date(item.published).toLocaleDateString(),typeof item.new_development==='boolean'?(item.new_development?'Newly collected':'Previously collected'):null].filter(Boolean);if(provenance.length)li.append(el('p',provenance.join(' · ')));if(item.description)li.append(el('p',item.description));list.append(li)}catch{}}c.append(el('h4','Source evidence'),list)}return c}
 function dashboard(){
  const root=el('section'),filterBar=actions(),reportArea=el('div');
  root.append(filterBar,reportArea);
@@ -323,6 +399,7 @@ function render(){nav.replaceChildren();for(const p of ['Overview','Watchlist','
  selection.onchange=()=>{if(selection.checked)selectedWatches.add(w.id);else selectedWatches.delete(w.id)};
  c.append(control('Select '+w.name,selection));
  const pending=runs.find(r=>r.watch_id===w.id&&['queued','running'].includes(r.status));const scan=button(pending?(pending.status==='running'?'Scanning…':pending.next_attempt_at?'Retry scheduled':'Scan queued'):'Scan now',async()=>{const r=await sb.rpc('sentinel_queue',{p_watch:w.id});if(r.error)throw r.error;await load();status(r.data?'Scan queued':'Scan already pending')});scan.disabled=!!pending||!w.active;const controls=actions(button('Edit',()=>form(w)),scan);
+ if(integrationAccess.crm)controls.append(button('Link relationship',()=>integrationOptions('crm',w)));
  if(deepAvailable){
   const deep=button('Deep investigation',async()=>{
    const result=await sb.rpc('sentinel_queue_deep',{p_watch:w.id});
@@ -348,6 +425,11 @@ App.onSession(async(s,p)=>{
  if(!org)return status('Choose an organization');
  const deep=await sb.rpc('sentinel_deep_available',{p_org:org});
  deepAvailable=!deep.error&&deep.data===true;
+ const integrations=await Promise.all(['crm','portfolio_management','work_board','content_studio'].map(async key=>{
+  const result=await sb.rpc('sentinel_integration_allowed',{p_org:org,p_feature:key});
+  return [key,!result.error&&result.data===true];
+ }));
+ integrationAccess=Object.fromEntries(integrations);
  try{await load()}catch(e){status(e.message);return}
  refreshTimer=setInterval(()=>refreshPendingScans().catch(()=>status('Scan status could not refresh. Try Refresh.')),15000);
 });

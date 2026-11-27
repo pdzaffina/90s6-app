@@ -584,6 +584,26 @@
     if (paths.length && canEdit()) sb.storage.from(BUCKET).remove(paths);
   };
 
+  async function installAssessmentDraft() {
+    const id = new URLSearchParams(location.search).get('sentinel');
+    if (!id || !/^[0-9a-f-]{36}$/i.test(id) || !App.hasFeature('news_watch')) return;
+    const organization = App.activeTenantId;
+    const allowed = await sb.rpc('sentinel_integration_allowed', {p_org:organization,p_feature:'work_board'});
+    if (allowed.error || allowed.data !== true) return;
+    const result = await sb.from('sentinel_scan_runs').select('id').eq('id',id).eq('org_id',organization)
+      .not('assessment','is',null).maybeSingle();
+    if (result.error || !result.data || App.activeTenantId!==organization) return;
+    const draft = document.createElement('button');
+    draft.type = 'button';
+    draft.textContent = 'Draft intelligence follow-up';
+    draft.addEventListener('click', () => {
+      if (!canEdit()) return toast('Choose a board where you can edit work items.');
+      board.openDraft('Review external intelligence finding',
+        'Review the linked assessment and decide whether follow-up is needed.\n\n'+SentinelLinks.assessmentUrl(id).href);
+    });
+    document.querySelector('.toolbar')?.append(draft);
+  }
+
   // ---------- Session handling ----------
   async function handle(session, profile) {
     if (!session) {
@@ -600,7 +620,7 @@
     if (!boards.length) { current = null; board.set([]); renderBar(); showGate('none'); return; }
     const saved = localStorage.getItem(CURRENT_KEY);
     const first = boards.find(b => b.id === saved) || boards[0];
-    if (await openBoard(first.id, true)) showGate(null);
+    if (await openBoard(first.id, true)) { showGate(null); void installAssessmentDraft(); }
   }
 
   // The shared App handles sign in and calls back with the session (or null)

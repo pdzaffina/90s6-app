@@ -50,7 +50,7 @@ GDELT DOC API is the default keyless news discovery provider. Brave is optional 
 | 3 | Governed assessment supports structured, citation-validated output and legacy Markdown. Bounded deep planning and follow-up share the existing AI budget and audit. Independent advisory risk review and executive briefing use the shared AI gateway. Deep and executive mobile verification pending. |
 | 4 | Per-run history, structured risk with independent severity and confidence, relationship-aware assessment, and category comparison added. Corroboration, resolution, and change validation pending. |
 | 5 | Threshold alerts, daily and weekly in-app digests, recipient preferences, acknowledgment, manual email with CC, and assessment deep links implemented. End-to-end digest and alert acceptance tests pending. |
-| 6 | CRM and Portfolio link records, Work Board task drafting, and Knowledge Base drafts added through existing authorization. Action Inbox and end-to-end integration checks pending. |
+| 6 | CRM and Portfolio link records, Work Board task drafting, and Knowledge Base drafts added through existing authorization. Opt-in Action Inbox exceptions added. Signed-in end-to-end checks across each destination pending. |
 | 7 | CSV/XLSX preview, interactive mapping, validation, duplicate skip/update, defaults, selected-watch management, audit, and throttled initial scans implemented. Optional AI enrichment pending. |
 | 8 | Coverage, freshness, collection health, risk counts, risk history, recommendations, and dashboard filters implemented. Executive briefing added using the eight most recent matching assessments. Broader history aggregation pending. |
 
@@ -125,3 +125,7 @@ The 2026-11-27 Aristocrat Interactive scan saved nine sources. The model used al
 ### Executive briefings and advisory risk review
 
 The executive overview can request a briefing for up to eight matching assessments. A single assessment supports a separate AI risk review. Global AI Admin controls both components. The common AI gateway re-reads the requested source records on the signed-in user's session and organization, and reserves the existing AI usage budget. The results remain advisory and link to the source assessments. Disable the components to hide the actions and reject requests, or redeploy the previous gateway if a rollback is needed.
+
+### Action Inbox
+
+Turn on “Send significant findings to Action Inbox” on a watch whose owner has both applications. The event-driven Sentinel rule writes through the existing exception evaluator. It assigns critical or high deteriorating findings supported by newly indexed evidence to the watch owner for review. A critical watch that loses collection raises a monitoring exception. Successful collection resolves that monitoring exception. Snooze, dismissal, remediation, communications, and activity use the existing Action Inbox workflows. Opening an exception source requires ongoing access to both the watch and Action Inbox. Turning off the watch integration hides its related exceptions. To stop event publication platform-wide, disable the `sentinel_publish_inbox` trigger in a forward migration.

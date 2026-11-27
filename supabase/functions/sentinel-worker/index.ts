@@ -100,29 +100,21 @@ Deno.serve(async req=>{
   for(const [k,v] of Object.entries({q:search+' when:'+lookback+'d',hl:'en-US',gl:'US',ceid:'US:en'}))u.searchParams.set(k,v);
   return rss(u,'google-news-rss','other');
  };
- const gdelt=async(search=query)=>{
-  const u=new URL('https://api.gdeltproject.org/api/v2/doc/doc');
-  for(const [k,v] of Object.entries({query:search,mode:'artlist',format:'json',maxrecords:'30',timespan:lookback+'d',sort:'datedesc'}))u.searchParams.set(k,v);
-  const r=await providerFetch('gdelt',u);
-  try{
-   const data=JSON.parse(await boundedBody(r));
-   if(!Array.isArray(data.articles))throw Error('Invalid GDELT response');
-   return normalizeEvidence(data.articles.map((a:any)=>({...a,published:a.seendate,source:a.domain})),'gdelt','other');
-  }catch{throw new ProviderError('gdelt returned an unreadable search response',true);}
- };
  let coverage=false;
  try{
-  evidence=await gdelt();
+  const local=await db.rpc('sentinel_gdelt_search',{p_terms:[job.name,...(Array.isArray(context.aliases)?context.aliases:[])],p_days:lookback});
+  if(local.error)throw Error(local.error.message);
+  const data=local.data;
+  if(!data?.latest||Date.now()-Date.parse(data.latest)>72*3600000)failures.push(new ProviderError('GDELT local index empty or stale',true));
+  evidence=normalizeEvidence((data?.articles||[]).map((a:any)=>({url:a.url,source:a.source,published:a.published,title:'GDELT indexed article: '+a.url,description:'Extracted organizations: '+a.organizations+'; themes: '+a.themes})), 'gdelt-local','other');
+  coverage=evidence.length>0;
+ }catch{failures.push(new ProviderError('GDELT local index unavailable',true));}
+ try{
+  const news=await google();
+  const urls=new Set(news.map(a=>a.url));
+  evidence=[...news,...evidence.filter(a=>!urls.has(a.url))];
   coverage=true;
- }catch(primary){
-  failures.push(primary);
-  try{
-   evidence=await google();
-   coverage=true;
-  }catch(secondary){
-   failures.push(secondary);
-  }
- }
+ }catch(failure){failures.push(failure);}
  try{
   const sources=await db.rpc('sentinel_scan_sources',{p_run:job.id,p_started_at:job.started_at});
   if(sources.error)throw Error('Could not load administrator source lists');

@@ -200,3 +200,20 @@ html[data-org-theme="vs"] .ap-index span:last-child{color:#E91E63}
 html[data-org-theme="vs"] .ap-tag:not(.off):not(.dim){background:#FCE1EB}
 html[data-org-theme="vs"] :focus-visible{outline:2px solid #C2185B;outline-offset:2px}
 @media(max-width:700px){html[data-org-theme="vs"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="vs"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="vs"] .ap-card>div{min-width:0}html[data-org-theme="vs"] .ap-org-brand-fields{grid-template-columns:minmax(0,1fr)}html[data-org-theme="vs"] #appNav button{min-height:44px}}
+
+/* Tiffany: robin's-egg blue, white ribbon and silver accents. */
+html[data-org-theme="tiffany"]{--ap-cloud:#F3FAF9;--ap-paper:#FFFFFF;--ap-line:#C0C6CC;--ap-ink:#202526;--ap-soft:#DDF4F1}
+html[data-org-theme="tiffany"] #appNav .ap-nav-top{background:#81D8D0;color:#202526;border-bottom:6px solid #fff;box-shadow:inset 0 -1px #C0C6CC}
+html[data-org-theme="tiffany"] #appNav :is(.brand,.ap-wordmark,.ap-brand-accent,.ap-org-label,.ap-org-icon,.ap-org-chevron,.ap-user-chevron,.who,#apTenantSelect,#apUserButton){color:#202526}
+html[data-org-theme="tiffany"] #appNav .ap-nav-top button{color:#202526;border-color:#007F7955}
+html[data-org-theme="tiffany"] #appNav .ap-org-control{border-color:#007F7955;background:#ffffff40}
+html[data-org-theme="tiffany"] #appNav .ap-avatar{background:#007F79;color:#fff}
+html[data-org-theme="tiffany"] #appNav nav a[aria-current]{background:#DDF4F1;color:#00645F}
+html[data-org-theme="tiffany"] .ap-card,html[data-org-theme="tiffany"] .ap-panel{background:var(--ap-paper)}
+html[data-org-theme="tiffany"] .ap-card-feature{border-top-color:#81D8D0}
+html[data-org-theme="tiffany"] .ap-card-glyph{color:var(--ap-blue)!important}
+html[data-org-theme="tiffany"] .ap-card:hover{border-color:var(--ap-blue)}
+html[data-org-theme="tiffany"] .ap-index{color:#81D8D0}
+html[data-org-theme="tiffany"] .ap-index span:last-child{color:#007F79}
+html[data-org-theme="tiffany"] :focus-visible{outline:2px solid #007F79;outline-offset:2px}
+@media(max-width:700px){html[data-org-theme="tiffany"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="tiffany"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="tiffany"] .ap-card>div{min-width:0}html[data-org-theme="tiffany"] .ap-org-brand-fields{grid-template-columns:minmax(0,1fr)}html[data-org-theme="tiffany"] #appNav button{min-height:44px}}

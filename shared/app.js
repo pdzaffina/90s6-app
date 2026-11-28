@@ -43,6 +43,10 @@
         if(data.theme_mode!=='default'&&data.primary_color)document.documentElement.style.setProperty('--ap-blue',data.primary_color);
         if(data.theme_mode!=='default'&&data.secondary_color)document.documentElement.style.setProperty('--ap-midnight',data.secondary_color);
         if(data.theme_mode!=='default'&&data.accent_color)document.documentElement.style.setProperty('--ap-slate',data.accent_color);
+        if(data.theme_mode==='christmas'&&data.allowed_special_themes?.includes('christmas')){
+          document.documentElement.dataset.orgTheme='christmas';
+          for(const [k,v] of Object.entries({'--ap-blue':'#B91C32','--ap-midnight':'#123D2C','--ap-slate':'#408A50'}))document.documentElement.style.setProperty(k,v);
+        }
         if(data.theme_mode==='tiffany'&&data.allowed_special_themes?.includes('tiffany')){
           document.documentElement.dataset.orgTheme='tiffany';
           for(const [k,v] of Object.entries({'--ap-blue':'#007F79','--ap-midnight':'#202526','--ap-slate':'#526B6B'}))document.documentElement.style.setProperty(k,v);

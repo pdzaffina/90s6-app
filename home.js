@@ -12,7 +12,7 @@
   App.onSession((session, profile) => {
     updateHero();
     if (!session) return;
-    if (!profile.intro_presentation_completed_at && !new URLSearchParams(location.search).has('intro_done') && localStorage.getItem('90s6-intro-launched:'+session.user.id)!=='yes') { localStorage.setItem('90s6-intro-launched:'+session.user.id,'yes'); location.replace('/training/90s6-introduction/?welcome=1'); return; }
+    if (profile.intro_presentation_enabled === true && !profile.intro_presentation_completed_at && !new URLSearchParams(location.search).has('intro_done') && localStorage.getItem('90s6-intro-launched:'+session.user.id)!=='yes') { localStorage.setItem('90s6-intro-launched:'+session.user.id,'yes'); location.replace('/training/90s6-introduction/?welcome=1'); return; }
     const hello = $('hello'); if (hello) hello.textContent = profile.full_name ? ', ' + profile.full_name : '';
     $('adminCard').hidden = !profile.is_admin;
     const canStudio = App.hasFeature('content_studio') && (profile.is_admin || profile.is_superuser || profile.is_content_creator);

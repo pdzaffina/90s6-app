@@ -10,7 +10,7 @@
  panel.className=isGlobal?'ap-panel':'ap-org-profile';
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
- '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option></select></label>'+ 
+ '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option><option value="vs" hidden disabled>VS</option></select></label>'+ 
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
  '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
  '<div class="ap-row"><button id="orgBrandSuggest" type="button" class="ap-btn" style="background:#e8f3fc;color:#006bb6;border-color:#b7d9ef">✦ Suggest palette with AI</button></div><p id="orgBrandAiStatus" class="ap-msg" role="status"></p><div id="orgBrandAiResult" class="ap-org-ai-result" hidden></div>'+ 
@@ -23,7 +23,7 @@
  async function load(id){
   tenant=id;loaded=false;logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
   Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);
-  const mode=$('orgThemeMode');const wild=mode.querySelector('[value=wild]');wild.hidden=wild.disabled=id!=='a037530e-a0e6-4e75-af35-443203187b09';mode.value='logo';
+  const mode=$('orgThemeMode');const wild=mode.querySelector('[value=wild]');wild.hidden=wild.disabled=id!=='a037530e-a0e6-4e75-af35-443203187b09';const vs=mode.querySelector('[value=vs]');vs.hidden=vs.disabled=wild.disabled;mode.value='logo';
   if(!id)return;
   const {data,error}=await sb.from('organization_profiles').select('*').eq('tenant_id',id).maybeSingle();
   if(error){status('Could not load profile: '+error.message);return;}

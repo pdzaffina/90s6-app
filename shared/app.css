@@ -188,3 +188,15 @@ html[data-org-theme="wild"] .ap-card:hover{border-color:var(--ap-blue)}
 .ap-theme-picker{display:grid;gap:8px;max-width:100%;margin:12px 0}
 .ap-theme-picker select{width:100%;min-width:0;min-height:44px}
 @media(max-width:700px){html[data-org-theme="wild"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="wild"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="wild"] .ap-card>div{min-width:0}html[data-org-theme="wild"] .ap-org-brand-fields{grid-template-columns:minmax(0,1fr)}html[data-org-theme="wild"] #appNav button{min-height:44px}}
+
+/* VS: pink stripes, black navigation and pearl reading surfaces. */
+html[data-org-theme="vs"]{--ap-cloud:#FFF9FB;--ap-paper:#fff;--ap-line:#F5A9C5;--ap-ink:#171317;--ap-soft:#FCE1EB}
+html[data-org-theme="vs"] #appNav .ap-nav-top{background:#171317;border-bottom:8px solid transparent;border-image:repeating-linear-gradient(90deg,#F5A9C5 0 15px,#FCE1EB 15px 30px) 1}
+html[data-org-theme="vs"] .ap-card,html[data-org-theme="vs"] .ap-panel{background:var(--ap-paper)}
+html[data-org-theme="vs"] .ap-card-glyph{color:var(--ap-blue)!important}
+html[data-org-theme="vs"] .ap-card:hover{border-color:var(--ap-blue)}
+html[data-org-theme="vs"] .ap-index{color:#F5A9C5}
+html[data-org-theme="vs"] .ap-index span:last-child{color:#E91E63}
+html[data-org-theme="vs"] .ap-tag:not(.off):not(.dim){background:#FCE1EB}
+html[data-org-theme="vs"] :focus-visible{outline:2px solid #C2185B;outline-offset:2px}
+@media(max-width:700px){html[data-org-theme="vs"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="vs"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="vs"] .ap-card>div{min-width:0}html[data-org-theme="vs"] .ap-org-brand-fields{grid-template-columns:minmax(0,1fr)}html[data-org-theme="vs"] #appNav button{min-height:44px}}

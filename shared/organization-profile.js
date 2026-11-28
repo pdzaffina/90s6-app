@@ -10,8 +10,8 @@
  panel.className=isGlobal?'ap-panel':'ap-org-profile';
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
- (isGlobal?'<fieldset class="ap-theme-picker"><legend>Special theme availability</legend><label><input type="checkbox" id="orgAllowWild"> Wild Theme</label><label><input type="checkbox" id="orgAllowVs"> VS</label><small>Enable themes for this organization. Disabling its active special theme restores the logo palette.</small></fieldset>':'')+
- '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option><option value="vs" hidden disabled>VS</option></select></label>'+ 
+ (isGlobal?'<fieldset class="ap-theme-picker"><legend>Special theme availability</legend><label><input type="checkbox" id="orgAllowWild"> Wild Theme</label><label><input type="checkbox" id="orgAllowVs"> VS</label><label><input type="checkbox" id="orgAllowTiffany"> Tiffany</label><small>Enable themes for this organization. Disabling its active special theme restores the logo palette.</small></fieldset>':'')+
+ '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option><option value="vs" hidden disabled>VS</option><option value="tiffany" hidden disabled>Tiffany</option></select></label>'+ 
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
  '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
  '<div class="ap-row"><button id="orgBrandSuggest" type="button" class="ap-btn" style="background:#e8f3fc;color:#006bb6;border-color:#b7d9ef">✦ Suggest palette with AI</button></div><p id="orgBrandAiStatus" class="ap-msg" role="status"></p><div id="orgBrandAiResult" class="ap-org-ai-result" hidden></div>'+ 
@@ -23,11 +23,11 @@
  const preview=()=>{const img=$('orgBrandPreview');img.hidden=!logo;if(logo)img.src=logo;else img.removeAttribute('src')};
  function syncThemes(allowed){
   const mode=$('orgThemeMode');
-  for(const key of ['wild','vs']){const option=mode.querySelector('[value='+key+']');option.hidden=option.disabled=!allowed.includes(key);}
+  for(const key of ['wild','vs','tiffany']){const option=mode.querySelector('[value='+key+']');option.hidden=option.disabled=!allowed.includes(key);}
   if(mode.selectedOptions[0]?.disabled)mode.value='logo';
  }
- const selectedThemes=()=>[['wild','orgAllowWild'],['vs','orgAllowVs']].filter(([k,id])=>$(id)?.checked).map(([k])=>k);
- if(isGlobal)for(const id of ['orgAllowWild','orgAllowVs'])$(id).onchange=()=>syncThemes(selectedThemes());
+ const selectedThemes=()=>[['wild','orgAllowWild'],['vs','orgAllowVs'],['tiffany','orgAllowTiffany']].filter(([k,id])=>$(id)?.checked).map(([k])=>k);
+ if(isGlobal)for(const id of ['orgAllowWild','orgAllowVs','orgAllowTiffany'])$(id).onchange=()=>syncThemes(selectedThemes());
  async function load(id){
   tenant=id;loaded=false;logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
   Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);
@@ -38,7 +38,7 @@
   if(tenant!==id)return;
   Object.entries(fields).forEach(([k,e])=>e.value=data?.[k]||defaults[k]);
   const allowed=data?.allowed_special_themes||[];
-  if(isGlobal){$('orgAllowWild').checked=allowed.includes('wild');$('orgAllowVs').checked=allowed.includes('vs');}
+  if(isGlobal){$('orgAllowWild').checked=allowed.includes('wild');$('orgAllowVs').checked=allowed.includes('vs');$('orgAllowTiffany').checked=allowed.includes('tiffany');}
   syncThemes(allowed);mode.value=data?.theme_mode||'logo';
   logo=data?.logo_data||null;preview();loaded=true;
  }

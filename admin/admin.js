@@ -117,7 +117,7 @@
       const actions = el('div', { className: 'ap-row' });
       const intro = el('button',{type:'button',className:'ap-btn sm',textContent:'Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off')});
       intro.onclick=async()=>{intro.disabled=true;const {error}=await App.sb.rpc('set_intro_presentation',{p_user:u.id,p_enabled:!u.intro_presentation_enabled});if(error){say(error.message);intro.disabled=false;return;}u.intro_presentation_enabled=!u.intro_presentation_enabled;intro.textContent='Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off');intro.disabled=false;};
-      actions.append(intro);
+      actions.append(intro); const tours=el('button',{type:'button',className:'ap-btn sm',textContent:'Application tours'});tours.onclick=()=>window.openUserTours(u);actions.append(tours);
       if (isMe) actions.append(el('span', { className: 'ap-msg', textContent: 'You' }));
       else {
         const btn = (text, cls, fn) => { const b = el('button', { type: 'button', className: 'ap-btn sm ' + cls, textContent: text }); b.addEventListener('click', fn); return b; };
@@ -125,8 +125,7 @@
           btn(u.is_admin ? 'Remove admin' : 'Make admin', '', () => act('set_admin', { id: u.id, is_admin: !u.is_admin })),
           btn(u.is_superuser ? 'Remove superuser' : 'Make superuser', '', () => act('set_superuser', { id: u.id, is_superuser: !u.is_superuser })),
           btn(u.disabled ? 'Enable' : 'Disable', '', () => act('set_disabled', { id: u.id, disabled: !u.disabled })),
-          btn('Reset tour', '', () => act('reset_onboarding', { id: u.id, kind: 'tour' }).then(() => say('Guided tour reset for ' + u.email + '.'))),
-          btn('Reset intro', '', () => act('reset_onboarding', { id: u.id, kind: 'intro' }).then(() => say('Intro presentation reset for ' + u.email + '.'))),
+                    btn('Reset intro', '', () => act('reset_onboarding', { id: u.id, kind: 'intro' }).then(() => say('Intro presentation reset for ' + u.email + '.'))),
           btn('Delete', 'danger', () => act('delete_user', { id: u.id }, 'Delete ' + u.email + '? This cannot be undone.'))
         );
       }

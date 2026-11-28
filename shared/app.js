@@ -329,4 +329,5 @@
       if (state !== 'unknown') cb(state === 'in' ? session : null, state === 'in' ? profile : null);
     }
   };
+  if(!document.querySelector('script[src*="/shared/tour.js"]')){const script=document.createElement('script');script.src='/shared/tour.js?v=modular-1';document.head.append(script);}
 })();

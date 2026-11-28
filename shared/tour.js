@@ -1,78 +1,17 @@
-/* First-login, account-specific guided tour. Completion is stored on the profile. */
 (() => {
- 'use strict';
- const steps = [
-  {path:'/',selector:'#appNav',title:'Welcome to 90S6',body:'Use the navigation to move between your workspace, Work Board, and My Profile.'},
-  {path:'/work-board/',selector:'.viewSwitch',title:'Two ways to organize work',body:'Board gives you a visual priority matrix. WBS shows your work items as a hierarchical spreadsheet.'},
-  {path:'/work-board/',selector:'#newBtn',title:'Create and update work items',body:'Add work items, assign an owner and due date, and organize them in columns and swimlanes. Use Layout to customize your board when permitted.'},
-  {path:'/work-board/',selector:'#viewWbs',title:'Work breakdown structure',body:'Choose WBS to view parent tasks and subtasks. In WBS mode you can export your work breakdown structure to Excel.'},
-  {path:'/profile/',selector:'#newPass',title:'Secure your account',body:'Enter a new password of at least 12 characters, then select Update password. You can also finish this tour without changing it right now.'}
- ];
- let userId=null,active=false,idx=0,box=null,highlight=null;
- const key=id=>'90s6-tour-progress:'+id;
- const path=()=>location.pathname.replace(/index\.html$/,'');
- const onStep=()=>path()===steps[idx].path;
- const clear=()=>{
-  if(box){box.remove();box=null}
-  if(highlight){highlight.style.outline=highlight.dataset.tourOutline||'';highlight.style.outlineOffset=highlight.dataset.tourOutlineOffset||'';delete highlight.dataset.tourOutline;delete highlight.dataset.tourOutlineOffset;highlight=null}
-  window.removeEventListener('resize',position);
-  window.removeEventListener('scroll',position,true);
- };
- function position(){
-  if(!box||!highlight)return;
-  const r=highlight.getBoundingClientRect(),w=box.offsetWidth,h=box.offsetHeight;
-  const left=Math.max(12,Math.min(window.innerWidth-w-12,r.left));
-  const below=r.bottom+12;
-  const top=idx===steps.length-1 && r.top>=h+18 ? r.top-h-12 : (below+h<=window.innerHeight-12?below:Math.max(12,r.top-h-12));
-  box.style.left=left+'px';box.style.top=top+'px';
- }
- async function finish(){
-  if(!userId)return;
-  active=false;clear();
-  try{sessionStorage.removeItem(key(userId))}catch(e){}
-  const {error}=await App.sb.from('profiles').update({tour_completed_at:new Date().toISOString()}).eq('id',userId);
-  if(error)console.warn('Could not save tour completion:',error.message);
- }
- function show(){
-  clear();
-  if(!active)return;
-  if(!onStep()){location.assign(steps[idx].path);return}
-  const step=steps[idx];
-  highlight=document.querySelector(step.selector);
-  if(!highlight){setTimeout(show,250);return}
-  highlight.dataset.tourOutline=highlight.style.outline||'';
-  highlight.dataset.tourOutlineOffset=highlight.style.outlineOffset||'';
-  highlight.style.outline='3px solid #227aaa';
-  highlight.style.outlineOffset='4px';
-  box=document.createElement('section');
-  box.setAttribute('role','dialog');box.setAttribute('aria-label','App introduction');
-  box.style.cssText='position:fixed;z-index:2147483640;width:min(340px,calc(100vw - 24px));padding:18px;background:#fff;color:#24313d;border:1px solid #c8d7e0;border-radius:12px;box-shadow:0 12px 40px #17232b55;font:14px/1.5 system-ui,sans-serif';
-  const count=document.createElement('div');count.textContent='INTRODUCTION  ·  '+(idx+1)+' OF '+steps.length;count.style.cssText='font-size:11px;font-weight:750;letter-spacing:.06em;color:#637889';
-  const title=document.createElement('h2');title.textContent=step.title;title.style.cssText='margin:8px 0;font-size:19px';
-  const body=document.createElement('p');body.textContent=step.body;body.style.cssText='margin:0 0 16px';
-  const controls=document.createElement('div');controls.style.cssText='display:flex;align-items:center;justify-content:space-between;gap:10px';
-  const skip=document.createElement('button');skip.type='button';skip.textContent='Skip intro';skip.style.cssText='background:transparent;border:0;color:#526575;cursor:pointer;padding:8px';skip.onclick=finish;
-  const next=document.createElement('button');next.type='button';next.textContent=idx===steps.length-1?'Finish intro':'Next';next.style.cssText='background:#253b4a;color:white;border:0;border-radius:8px;padding:9px 16px;cursor:pointer;font-weight:700';
-  next.onclick=()=>{if(idx===steps.length-1){finish();return}idx++;try{sessionStorage.setItem(key(userId),String(idx))}catch(e){}show()};
-  controls.append(skip,next);box.append(count,title,body,controls);document.body.append(box);
-  position();window.addEventListener('resize',position);window.addEventListener('scroll',position,true);
- }
- function restart(){
-  if(!userId)return;
-  idx=0;active=true;
-  try{sessionStorage.setItem(key(userId),'0')}catch(e){}
-  App.sb.from('profiles').update({tour_completed_at:null}).eq('id',userId).then(({error})=>{if(error)console.warn('Could not reset tour:',error.message)});
-  show();
- }
- App.onSession((session,profile)=>{
-  if(!session||!profile){active=false;clear();userId=null;return}
-  if(userId===session.user.id)return;
-  userId=session.user.id;
-
-  let progress=null;
-  try{progress=sessionStorage.getItem(key(userId))}catch(e){}
-  if(progress!==null){idx=Math.min(steps.length-1,Math.max(0,Number(progress)||0));active=true;show()}
-  else if(!profile.tour_completed_at){idx=0;active=true;try{sessionStorage.setItem(key(userId),'0')}catch(e){}show()}
- });
- window.AppTour={restart,finish};
+'use strict';
+const catalog=[["workspace","/","Workspace & Navigation",null,[["#appNav","Navigate your workspace","Open the applications available to you. Use the organization selector to switch workspaces."],["main","Your workspace","Choose an application card to get started."]]],["action_inbox","/action-inbox/","Action Inbox","action_inbox",[["#ainboxWorkstream","Choose a workstream","Filter exceptions by workstream."],["#ainboxList","Review exceptions","Select an exception to review ownership and next steps."],["#ainboxAssessment","Assess priorities","Review the assessment and use AI assistance when available."]]],["work_board","/work-board/","Work Boards","work_board",[["#newBtn","Create work","Add tasks, owners and due dates."],["#viewWbs","Work breakdown structure","Switch to the hierarchical task view."],["#board","Organize work","Move items between lanes and track progress."]]],["portfolio_management","/portfolio-management/","Portfolio Management","portfolio_management",[["#portfolioSelect","Choose a portfolio","Select the portfolio to prioritize."],["#tabs","Plan and prioritize","Assess initiatives, compare capacity and build scenarios."],["#content","Review your portfolio","Use the selected view to manage initiatives and decisions."]]],["crm","/crm/","Relationships / CRM","crm",[["#crmNav","Relationship navigation","Explore customers, associates, engagements and commitments according to your configuration."],["#crmView","Relationship health","Review records, feedback and outstanding commitments."],["#crmAdd","Add a record","Create a record in the current view when permitted."]]],["news_watch","/news-watch/","Sentinel / News Watch","news_watch",[["#crmNav","Explore Sentinel","Use the navigation to switch between available intelligence views."],["#nwView","Monitor organizations","Create watches, choose scan settings and run manual scans."],["#nwStatus","Track scans","Review scan progress and errors."],["#nwView","Review intelligence","Open assessments and source evidence. Expand vendor groups to inspect details."]]],["training","/training/","Training","training",[["#courseCards","Explore courses","Open a shared course and work through its lessons."],["#creatorTools","Create training","If permitted, curate a custom training plan."]]],["prompt_library","/prompts/","Prompt Library","prompt_library",[["main","Find prompts","Browse available prompts and copy useful examples for your work."]]],["knowledge_base","/knowledge-base/","Knowledge Base","knowledge_base",[["main","Find knowledge","Browse shared articles and open relevant guidance."]]],["content_studio","/content-studio/","Content Studio","content_studio",[["#studioModeTabs","Choose content type","Switch between lessons, prompts and knowledge articles as permitted."],["#lessonStudio","Manage courses","Edit lessons and publish content to authorized audiences."]]]];
+let session=null,profile=null,dialog=null,marked=null,oldOutline='',active=null,index=0,manual=false;
+const clear=()=>{if(dialog)dialog.remove();dialog=null;if(marked)marked.style.outline=oldOutline;marked=null;};
+const visible=e=>e&&e.getClientRects().length&&getComputedStyle(e).visibility!=='hidden';
+const current=()=>catalog.find(c=>location.pathname.replace(/index\.html$/,'')===c[1]);
+const allowed=c=>!c[3]||App.hasFeature(c[3]);
+async function finish(){const c=active;clear();active=null;if(c&&!manual){const {error}=await App.sb.rpc('complete_app_tour',{p_key:c[0]});if(error)console.warn('Tour completion not saved',error.message);}}
+function show(){clear();if(!active)return;const step=active[4][index];if(!step)return finish();const target=document.querySelector(step[0]);if(visible(target)){marked=target;oldOutline=target.style.outline;target.style.outline='3px solid #227aaa';target.scrollIntoView({block:'nearest'});}
+dialog=document.createElement('section');dialog.setAttribute('role','dialog');dialog.setAttribute('aria-label',active[2]+' tour');dialog.style.cssText='position:fixed;bottom:16px;right:12px;z-index:2147483640;width:min(360px,calc(100vw - 24px));box-sizing:border-box;padding:18px;background:#fff;color:#24313d;border:1px solid #c8d7e0;border-radius:12px;box-shadow:0 12px 40px #17232b55;font:14px/1.5 system-ui';
+const add=(tag,t)=>{const e=document.createElement(tag);e.textContent=t;dialog.append(e);return e;};add('small',active[2]+' · '+(index+1)+' of '+active[4].length);add('h2',step[1]);add('p',step[2]);const controls=document.createElement('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap';dialog.append(controls);const button=(t,fn)=>{const b=document.createElement('button');b.type='button';b.className='ap-btn sm';b.textContent=t;b.onclick=fn;controls.append(b);};button('Skip',finish);if(index)button('Back',()=>{index--;show()});button(index===active[4].length-1?'Finish':'Next',()=>{index++;show()});document.body.append(dialog);}
+function start(c,m=false){if(!c||!allowed(c))return;active=c;manual=m;index=0;show();}
+window.AppTour={restart:()=>{const c=current();if(c)start(c,true);else location.assign('/?tour=manual');},finish};
+window.AppTourCatalog=catalog;
+App.onSession(async(s,p)=>{clear();active=null;session=s;profile=p;if(!s)return;const c=current();if(!c||!allowed(c))return;const q=new URLSearchParams(location.search);if(q.get('tour')==='manual'){start(c,true);return;}const {data,error}=await App.sb.from('user_app_tours').select('enabled,completed_at').eq('user_id',s.user.id).eq('tour_key',c[0]).maybeSingle();if(!error&&session?.user.id===s.user.id&&data?.enabled&&!data.completed_at&&!document.hidden)start(c);});
 })();

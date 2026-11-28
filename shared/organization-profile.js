@@ -72,7 +72,8 @@
   logo=data?.logo_data||null;preview();loaded=true;
  }
  if(isGlobal){
-  (async()=>{const {data,error}=await sb.from('tenants').select('id,name').order('name');if(error){status(error.message);return;}for(const t of data||[]){const o=document.createElement('option');o.value=t.id;o.textContent=t.name;$('orgBrandTenant').append(o);} })();
+  renderAccess([]);
+  App.onSession(async(session,profile)=>{if(!session||!profile?.is_admin)return;const select=$('orgBrandTenant');const {data,error}=await sb.from('tenants').select('id,name').order('name');if(error){status(error.message);return;}select.replaceChildren(new Option('Choose organization',''));for(const t of data||[])select.append(new Option(t.name,t.id));const id=App.activeTenantId||data?.[0]?.id;if(id){select.value=id;await load(id);}});
   $('orgBrandTenant').onchange=e=>load(e.target.value);
  }else{
   App.onSession((session,profile)=>{if(!session)return;const id=new URLSearchParams(location.search).get('tenant')||App.activeTenantId;if(id)load(id)});

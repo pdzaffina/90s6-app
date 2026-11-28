@@ -10,6 +10,7 @@
  panel.className=isGlobal?'ap-panel':'ap-org-profile';
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
+ (isGlobal?'<fieldset class="ap-theme-picker"><legend>Special theme availability</legend><label><input type="checkbox" id="orgAllowWild"> Wild Theme</label><label><input type="checkbox" id="orgAllowVs"> VS</label><small>Enable themes for this organization. Disabling its active special theme restores the logo palette.</small></fieldset>':'')+
  '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option><option value="vs" hidden disabled>VS</option></select></label>'+ 
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
  '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
@@ -20,16 +21,25 @@
  const status=(t)=>{$('orgBrandStatus').textContent=t};
  const fields={primary_color:$('orgBrandPrimary'),secondary_color:$('orgBrandSecondary'),accent_color:$('orgBrandAccent')};
  const preview=()=>{const img=$('orgBrandPreview');img.hidden=!logo;if(logo)img.src=logo;else img.removeAttribute('src')};
+ function syncThemes(allowed){
+  const mode=$('orgThemeMode');
+  for(const key of ['wild','vs']){const option=mode.querySelector('[value='+key+']');option.hidden=option.disabled=!allowed.includes(key);}
+  if(mode.selectedOptions[0]?.disabled)mode.value='logo';
+ }
+ const selectedThemes=()=>[['wild','orgAllowWild'],['vs','orgAllowVs']].filter(([k,id])=>$(id)?.checked).map(([k])=>k);
+ if(isGlobal)for(const id of ['orgAllowWild','orgAllowVs'])$(id).onchange=()=>syncThemes(selectedThemes());
  async function load(id){
   tenant=id;loaded=false;logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
   Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);
-  const mode=$('orgThemeMode');const wild=mode.querySelector('[value=wild]');wild.hidden=wild.disabled=id!=='a037530e-a0e6-4e75-af35-443203187b09';const vs=mode.querySelector('[value=vs]');vs.hidden=vs.disabled=wild.disabled;mode.value='logo';
+  const mode=$('orgThemeMode');mode.value='logo';syncThemes([]);
   if(!id)return;
   const {data,error}=await sb.from('organization_profiles').select('*').eq('tenant_id',id).maybeSingle();
   if(error){status('Could not load profile: '+error.message);return;}
   if(tenant!==id)return;
   Object.entries(fields).forEach(([k,e])=>e.value=data?.[k]||defaults[k]);
-  mode.value=data?.theme_mode||'logo';
+  const allowed=data?.allowed_special_themes||[];
+  if(isGlobal){$('orgAllowWild').checked=allowed.includes('wild');$('orgAllowVs').checked=allowed.includes('vs');}
+  syncThemes(allowed);mode.value=data?.theme_mode||'logo';
   logo=data?.logo_data||null;preview();loaded=true;
  }
  if(isGlobal){
@@ -141,6 +151,7 @@
   const btn=$('orgBrandSave');btn.disabled=true;status('Saving...');
   try{
    const payload={tenant_id:tenant,logo_data:logo,theme_mode:$('orgThemeMode').value};
+   if(isGlobal)payload.allowed_special_themes=selectedThemes();
    for(const [k,e] of Object.entries(fields))payload[k]=e.value.toLowerCase()===defaults[k].toLowerCase()?null:e.value;
    const {error}=await sb.from('organization_profiles').upsert(payload,{onConflict:'tenant_id'});
    if(error)throw error;

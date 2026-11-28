@@ -49,7 +49,10 @@
   const id=tenant,allowed=selectedThemes(),btn=$('orgThemeAccessSave'),msg=$('orgThemeAccessStatus');
   btn.disabled=true;$('orgBrandTenant').disabled=true;$('orgBrandSave').disabled=true;msg.textContent='Saving...';
   try{
-   const {data,error}=await sb.from('organization_profiles').upsert({tenant_id:id,allowed_special_themes:allowed},{onConflict:'tenant_id'}).select('theme_mode,allowed_special_themes').single();
+   const {data:existing,error:lookupError}=await sb.from('organization_profiles').select('tenant_id').eq('tenant_id',id).maybeSingle();
+   if(lookupError)throw lookupError;
+   const query=existing?sb.from('organization_profiles').update({allowed_special_themes:allowed}).eq('tenant_id',id):sb.from('organization_profiles').insert({tenant_id:id,allowed_special_themes:allowed});
+   const {data,error}=await query.select('theme_mode,allowed_special_themes').single();
    if(error)throw error;
    savedAllowed=data.allowed_special_themes||[];savedMode=data.theme_mode||'logo';
    syncThemes(savedAllowed,savedMode);renderAccess(savedAllowed);msg.textContent='Theme availability saved.';
@@ -182,7 +185,9 @@
   try{
    const payload={tenant_id:tenant,logo_data:logo,theme_mode:$('orgThemeMode').value};
    for(const [k,e] of Object.entries(fields))payload[k]=e.value.toLowerCase()===defaults[k].toLowerCase()?null:e.value;
-   const {error}=await sb.from('organization_profiles').upsert(payload,{onConflict:'tenant_id'});
+   const {data:existing,error:lookupError}=await sb.from('organization_profiles').select('tenant_id').eq('tenant_id',tenant).maybeSingle();
+   if(lookupError)throw lookupError;
+   const {error}=existing?await sb.from('organization_profiles').update(payload).eq('tenant_id',tenant):await sb.from('organization_profiles').insert(payload);
    if(error)throw error;
    status('Organization profile saved.');window.dispatchEvent(new Event('organization-profile-updated'));
   }catch(err){status('Save failed: '+err.message)}

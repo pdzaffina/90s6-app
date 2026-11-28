@@ -1,0 +1,11 @@
+(() => {
+const labels={workspace:'Workspace & Navigation',action_inbox:'Action Inbox',work_board:'Work Boards',portfolio_management:'Portfolio Management',crm:'Relationships / CRM',news_watch:'Sentinel / News Watch',training:'Training',prompt_library:'Prompt Library',knowledge_base:'Knowledge Base',content_studio:'Content Studio'};
+window.openUserTours=async(user,tenant=null)=>{
+const {data,error}=await App.sb.from('user_app_tours').select('tour_key,enabled,completed_at').eq('user_id',user.id);
+if(error){alert(error.message);return;}
+const map=new Map((data||[]).map(x=>[x.tour_key,x]));const d=document.createElement('dialog');d.style.cssText='width:min(520px,calc(100vw - 32px));max-height:85vh;overflow:auto;padding:20px;border:1px solid #aab8c2;border-radius:12px;background:var(--ap-bg,#fff);color:inherit';
+const h=document.createElement('h2');h.textContent='Application tours';d.append(h);const p=document.createElement('p');p.textContent=user.email||user.id;d.append(p);const msg=document.createElement('p');msg.setAttribute('role','status');
+for(const [key,label] of Object.entries(labels)){const row=document.createElement('div');row.style.cssText='display:flex;align-items:center;gap:12px;padding:8px 0;border-bottom:1px solid #aab8c255';const l=document.createElement('label');l.style.flex='1';const check=document.createElement('input');check.type='checkbox';check.checked=map.get(key)?.enabled===true;l.append(check,document.createTextNode(' '+label));const reset=document.createElement('button');reset.type='button';reset.className='ap-btn sm';reset.textContent=map.get(key)?.completed_at?'Reset completed':'Reset';const save=async(replay)=>{check.disabled=reset.disabled=true;const {error}=await App.sb.rpc('set_app_tour',{p_user:user.id,p_enabled:check.checked,p_tenant:tenant,p_key:key,p_reset:replay});if(error){msg.textContent=error.message; if(!replay)check.checked=!check.checked;}else{msg.textContent='Saved '+label;if(replay)reset.textContent='Reset';}check.disabled=reset.disabled=false;};check.onchange=()=>save(false);reset.onclick=()=>save(true);row.append(l,reset);d.append(row);}
+const close=document.createElement('button');close.className='ap-btn';close.textContent='Done';close.onclick=()=>d.close();d.append(msg,close);d.onclose=()=>d.remove();document.body.append(d);d.showModal();
+};
+})();

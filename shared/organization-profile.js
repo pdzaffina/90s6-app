@@ -10,8 +10,8 @@
  panel.className=isGlobal?'ap-panel':'ap-org-profile';
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
- (isGlobal?'<fieldset class="ap-theme-picker"><legend>Special theme availability</legend><label><input type="checkbox" id="orgAllowWild"> Wild Theme</label><label><input type="checkbox" id="orgAllowVs"> VS</label><label><input type="checkbox" id="orgAllowTiffany"> Tiffany</label><small>Enable themes for this organization. Disabling its active special theme restores the logo palette.</small></fieldset>':'')+
- '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option><option value="vs" hidden disabled>VS</option><option value="tiffany" hidden disabled>Tiffany</option></select></label>'+ 
+ (isGlobal?'<fieldset class="ap-theme-picker ap-theme-access" id="orgThemeAccess" disabled><legend>Special theme availability</legend><p class="ap-msg">Choose which themes this organization can use.</p><div id="orgThemeChoices"></div><button type="button" class="ap-btn primary" id="orgThemeAccessSave">Save theme availability</button><p id="orgThemeAccessStatus" role="status" class="ap-msg"></p></fieldset>':'')+
+ '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input" disabled></select></label>'+
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
  '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
  '<div class="ap-row"><button id="orgBrandSuggest" type="button" class="ap-btn" style="background:#e8f3fc;color:#006bb6;border-color:#b7d9ef">✦ Suggest palette with AI</button></div><p id="orgBrandAiStatus" class="ap-msg" role="status"></p><div id="orgBrandAiResult" class="ap-org-ai-result" hidden></div>'+ 
@@ -21,25 +21,54 @@
  const status=(t)=>{$('orgBrandStatus').textContent=t};
  const fields={primary_color:$('orgBrandPrimary'),secondary_color:$('orgBrandSecondary'),accent_color:$('orgBrandAccent')};
  const preview=()=>{const img=$('orgBrandPreview');img.hidden=!logo;if(logo)img.src=logo;else img.removeAttribute('src')};
- function syncThemes(allowed){
+ const themes=[{id:'wild',name:'Wild Theme',colors:['#C40016','#D6AA7C','#15151B']},{id:'vs',name:'VS',colors:['#E91E63','#F5A9C5','#171317']},{id:'tiffany',name:'Tiffany',colors:['#81D8D0','#007F79','#FFFFFF']}];
+ let savedAllowed=[],savedMode='logo',loadVersion=0;
+ function syncThemes(allowed,preferred=$('orgThemeMode').value){
   const mode=$('orgThemeMode');
-  for(const key of ['wild','vs','tiffany']){const option=mode.querySelector('[value='+key+']');option.hidden=option.disabled=!allowed.includes(key);}
-  if(mode.selectedOptions[0]?.disabled)mode.value='logo';
+  mode.replaceChildren();
+  for(const t of [{id:'default',name:'90s6 Default'},{id:'logo',name:'Logo-generated / custom palette'},...themes.filter(t=>allowed.includes(t.id))]){
+   const o=document.createElement('option');o.value=t.id;o.textContent=t.name;mode.append(o);
+  }
+  mode.value=Array.from(mode.options).some(o=>o.value===preferred)?preferred:'logo';
  }
- const selectedThemes=()=>[['wild','orgAllowWild'],['vs','orgAllowVs'],['tiffany','orgAllowTiffany']].filter(([k,id])=>$(id)?.checked).map(([k])=>k);
- if(isGlobal)for(const id of ['orgAllowWild','orgAllowVs','orgAllowTiffany'])$(id).onchange=()=>syncThemes(selectedThemes());
+ function renderAccess(allowed){
+  if(!isGlobal)return;
+  const host=$('orgThemeChoices');host.replaceChildren();
+  for(const t of themes){
+   const label=document.createElement('label');label.className='ap-theme-choice';
+   const swatches=document.createElement('span');swatches.className='ap-theme-swatches';
+   for(const color of t.colors){const sw=document.createElement('span');sw.style.backgroundColor=color;swatches.append(sw);}
+   const name=document.createElement('span');name.textContent=t.name;
+   const input=document.createElement('input');input.type='checkbox';input.value=t.id;input.checked=allowed.includes(t.id);
+   label.append(swatches,name,input);host.append(label);
+  }
+ }
+ const selectedThemes=()=>Array.from($('orgThemeChoices')?.querySelectorAll('input:checked')||[],e=>e.value);
+ if(isGlobal)$('orgThemeAccessSave').onclick=async()=>{
+  if(!loaded||!tenant)return;
+  const id=tenant,allowed=selectedThemes(),btn=$('orgThemeAccessSave'),msg=$('orgThemeAccessStatus');
+  btn.disabled=true;$('orgBrandTenant').disabled=true;$('orgBrandSave').disabled=true;msg.textContent='Saving...';
+  try{
+   const {data,error}=await sb.from('organization_profiles').upsert({tenant_id:id,allowed_special_themes:allowed},{onConflict:'tenant_id'}).select('theme_mode,allowed_special_themes').single();
+   if(error)throw error;
+   savedAllowed=data.allowed_special_themes||[];savedMode=data.theme_mode||'logo';
+   syncThemes(savedAllowed,savedMode);renderAccess(savedAllowed);msg.textContent='Theme availability saved.';
+   window.dispatchEvent(new Event('organization-profile-updated'));
+  }catch(e){msg.textContent='Save failed: '+e.message;}
+  finally{btn.disabled=false;$('orgBrandTenant').disabled=false;$('orgBrandSave').disabled=false;}
+ };
  async function load(id){
-  tenant=id;loaded=false;logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
+  const version=++loadVersion;tenant=id;loaded=false;savedAllowed=[];savedMode='logo';$('orgThemeMode').disabled=true;$('orgBrandSave').disabled=true;if(isGlobal){$('orgThemeAccess').disabled=true;renderAccess([]);$('orgThemeAccessStatus').textContent='';}logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
   Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);
-  const mode=$('orgThemeMode');mode.value='logo';syncThemes([]);
+  const mode=$('orgThemeMode');syncThemes([],'logo');
   if(!id)return;
   const {data,error}=await sb.from('organization_profiles').select('*').eq('tenant_id',id).maybeSingle();
+  if(version!==loadVersion)return;
   if(error){status('Could not load profile: '+error.message);return;}
-  if(tenant!==id)return;
   Object.entries(fields).forEach(([k,e])=>e.value=data?.[k]||defaults[k]);
   const allowed=data?.allowed_special_themes||[];
-  if(isGlobal){$('orgAllowWild').checked=allowed.includes('wild');$('orgAllowVs').checked=allowed.includes('vs');$('orgAllowTiffany').checked=allowed.includes('tiffany');}
-  syncThemes(allowed);mode.value=data?.theme_mode||'logo';
+  savedAllowed=allowed;savedMode=data?.theme_mode||'logo';syncThemes(allowed,savedMode);renderAccess(allowed);
+  mode.disabled=false;$('orgBrandSave').disabled=false;if(isGlobal)$('orgThemeAccess').disabled=false;
   logo=data?.logo_data||null;preview();loaded=true;
  }
  if(isGlobal){
@@ -148,15 +177,14 @@
  };
  $('orgBrandSave').onclick=async()=>{
   if(!tenant||!loaded){status('Select an organization and wait for its profile to load.');return;}
-  const btn=$('orgBrandSave');btn.disabled=true;status('Saving...');
+  const btn=$('orgBrandSave');btn.disabled=true;if(isGlobal){$('orgBrandTenant').disabled=true;$('orgThemeAccess').disabled=true;}status('Saving...');
   try{
    const payload={tenant_id:tenant,logo_data:logo,theme_mode:$('orgThemeMode').value};
-   if(isGlobal)payload.allowed_special_themes=selectedThemes();
    for(const [k,e] of Object.entries(fields))payload[k]=e.value.toLowerCase()===defaults[k].toLowerCase()?null:e.value;
    const {error}=await sb.from('organization_profiles').upsert(payload,{onConflict:'tenant_id'});
    if(error)throw error;
    status('Organization profile saved.');window.dispatchEvent(new Event('organization-profile-updated'));
   }catch(err){status('Save failed: '+err.message)}
-  finally{btn.disabled=false;}
+  finally{btn.disabled=false;if(isGlobal){$('orgBrandTenant').disabled=false;$('orgThemeAccess').disabled=false;}}
  };
 })();

@@ -21,7 +21,7 @@
  const status=(t)=>{$('orgBrandStatus').textContent=t};
  const fields={primary_color:$('orgBrandPrimary'),secondary_color:$('orgBrandSecondary'),accent_color:$('orgBrandAccent')};
  const preview=()=>{const img=$('orgBrandPreview');img.hidden=!logo;if(logo)img.src=logo;else img.removeAttribute('src')};
- const themes=[{id:'wild',name:'Wild Theme',colors:['#C40016','#D6AA7C','#15151B']},{id:'vs',name:'VS',colors:['#E91E63','#F5A9C5','#171317']},{id:'tiffany',name:'Tiffany',colors:['#81D8D0','#007F79','#FFFFFF']}];
+ const themes=[{id:'wild',name:'Wild Theme',colors:['#C40016','#D6AA7C','#15151B']},{id:'vs',name:'VS',colors:['#E91E63','#F5A9C5','#171317']},{id:'tiffany',name:'Tiffany',colors:['#81D8D0','#007F79','#FFFFFF']},{id:'christmas',name:'Christmas',colors:['#123D2C','#B91C32','#D4AF37']}];
  let savedAllowed=[],savedMode='logo',loadVersion=0;
  function syncThemes(allowed,preferred=$('orgThemeMode').value){
   const mode=$('orgThemeMode');

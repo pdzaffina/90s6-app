@@ -217,3 +217,14 @@ html[data-org-theme="tiffany"] .ap-index{color:#81D8D0}
 html[data-org-theme="tiffany"] .ap-index span:last-child{color:#007F79}
 html[data-org-theme="tiffany"] :focus-visible{outline:2px solid #007F79;outline-offset:2px}
 @media(max-width:700px){html[data-org-theme="tiffany"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="tiffany"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="tiffany"] .ap-card>div{min-width:0}html[data-org-theme="tiffany"] .ap-org-brand-fields{grid-template-columns:minmax(0,1fr)}html[data-org-theme="tiffany"] #appNav button{min-height:44px}}
+
+.ap-theme-access{border:1px solid var(--ap-line);border-radius:10px;padding:14px;min-width:0;margin:16px 0}
+.ap-theme-access legend{font-weight:700;padding:0 6px}
+#orgThemeChoices{display:grid;gap:8px}
+.ap-theme-choice{display:grid!important;grid-template-columns:64px minmax(0,1fr) 24px;align-items:center;gap:12px;min-height:48px;padding:10px;border:1px solid var(--ap-line);border-radius:8px;background:var(--ap-paper);cursor:pointer}
+.ap-theme-choice input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:var(--ap-blue)}
+.ap-theme-swatches{display:flex;height:28px;overflow:hidden;border:1px solid var(--ap-line);border-radius:5px}
+.ap-theme-swatches span{flex:1}
+.ap-theme-access:disabled{opacity:.65}
+#orgThemeAccessSave{justify-self:start;min-height:44px}
+@media(max-width:480px){#orgThemeAccessSave{width:100%}.ap-theme-choice{grid-template-columns:52px minmax(0,1fr) 24px;gap:8px}}

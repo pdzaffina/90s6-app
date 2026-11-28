@@ -115,6 +115,9 @@
         : !u.last_seen_at ? el('span', { className: 'ap-tag dim', textContent: 'Invited' })
         : el('span', { className: 'ap-tag', textContent: 'Active' });
       const actions = el('div', { className: 'ap-row' });
+      const intro = el('button',{type:'button',className:'ap-btn sm',textContent:'Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off')});
+      intro.onclick=async()=>{intro.disabled=true;const {error}=await App.sb.rpc('set_intro_presentation',{p_user:u.id,p_enabled:!u.intro_presentation_enabled});if(error){say(error.message);intro.disabled=false;return;}u.intro_presentation_enabled=!u.intro_presentation_enabled;intro.textContent='Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off');intro.disabled=false;};
+      actions.append(intro);
       if (isMe) actions.append(el('span', { className: 'ap-msg', textContent: 'You' }));
       else {
         const btn = (text, cls, fn) => { const b = el('button', { type: 'button', className: 'ap-btn sm ' + cls, textContent: text }); b.addEventListener('click', fn); return b; };
@@ -143,7 +146,7 @@
 
   async function load() {
     say('Loading...');
-    try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator'); const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));
+    try { const { users } = await call('list'); const {data:roles}=await App.sb.from('profiles').select('id,is_content_creator,intro_presentation_enabled'); for(const u of users)u.intro_presentation_enabled=(roles||[]).find(x=>x.id===u.id)?.intro_presentation_enabled===true; const roleMap=new Map((roles||[]).map(x=>[x.id,x.is_content_creator]));
       const {data:membershipData,error:membershipError}=await App.sb.from('tenant_members').select('user_id,tenant_id,role,status,tenants(name)').order('created_at');
       if(membershipError)throw membershipError;
       organizationsByUser=new Map();

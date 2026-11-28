@@ -228,3 +228,18 @@ html[data-org-theme="tiffany"] :focus-visible{outline:2px solid #007F79;outline-
 .ap-theme-access:disabled{opacity:.65}
 #orgThemeAccessSave{justify-self:start;min-height:44px}
 @media(max-width:480px){#orgThemeAccessSave{width:100%}.ap-theme-choice{grid-template-columns:52px minmax(0,1fr) 24px;gap:8px}}
+
+/* Christmas organization theme */
+html[data-org-theme="christmas"]{--ap-cloud:#FFF8E7;--ap-paper:#FFFFFF;--ap-line:#D9D0B7;--ap-ink:#202526;--ap-soft:#F4EAD1}
+html[data-org-theme="christmas"] #appNav .ap-nav-top{background:#123D2C;border-bottom:5px solid #B91C32;box-shadow:inset 0 -2px #D4AF37}
+html[data-org-theme="christmas"] #appNav .ap-wordmark .ap-logo-s{color:#D4AF37}
+html[data-org-theme="christmas"] .ap-card,html[data-org-theme="christmas"] .ap-panel{background:var(--ap-paper)}
+html[data-org-theme="christmas"] .ap-card{border-top:3px solid #D4AF37}
+html[data-org-theme="christmas"] .ap-card-glyph{color:#B91C32!important}
+html[data-org-theme="christmas"] .ap-index{color:#408A50}
+html[data-org-theme="christmas"] .ap-index span:last-child{color:#B91C32}
+html[data-org-theme="christmas"] #appNav nav a[aria-current]{background:#E5F0E7;color:#123D2C}
+html[data-org-theme="christmas"] #appNav .ap-nav-top{position:relative;padding-bottom:22px}
+html[data-org-theme="christmas"] #appNav .ap-nav-top::after{content:"";position:absolute;bottom:0;left:0;right:0;height:19px;pointer-events:none;background-image:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22100%22%20height%3D%2230%22%20viewBox%3D%220%200%20100%2030%22%3E%3Cpath%20fill%3D%22%23D4AF37%22%20d%3D%22M12%203l3%207%208%201-6%205%202%208-7-4-7%204%202-8-6-5%208-1z%22%2F%3E%3Cg%20transform%3D%22translate(65%2016)%22%3E%3Cpath%20fill%3D%22%23408A50%22%20d%3D%22M0%200Q-18%201-25-12L-15-9-17-15-7-10%200-14Q8-5%200%200M0%200Q18%201%2025-12L15-9%2017-15%207-10%200-14Q-8-5%200%200%22%2F%3E%3Ccircle%20cx%3D%22-4%22%20r%3D%224%22%20fill%3D%22%23B91C32%22%2F%3E%3Ccircle%20cx%3D%224%22%20r%3D%224%22%20fill%3D%22%23D52D40%22%2F%3E%3Ccircle%20cy%3D%225%22%20r%3D%224%22%20fill%3D%22%23B91C32%22%2F%3E%3C%2Fg%3E%3C%2Fsvg%3E");background-repeat:repeat-x;background-size:70px 21px;background-position:center}
+html[data-org-theme="christmas"] :focus-visible{outline:2px solid #B91C32;outline-offset:2px}
+@media(max-width:700px){html[data-org-theme="christmas"] .ap-cards{grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}html[data-org-theme="christmas"] .ap-card{min-width:0;overflow-wrap:anywhere}html[data-org-theme="christmas"] #appNav button{min-height:44px}}

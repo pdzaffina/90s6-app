@@ -98,6 +98,30 @@
   const links=new Map(Array.from(menu.querySelectorAll('a')).map(a=>[a.getAttribute('href'),a]));
   const groupHeadings=[];
   let activeRow=null, activeSub=null, activeExpand=null;
+  const mobileParents=new Map();
+  const mobileMode=()=>matchMedia('(max-width:760px)').matches;
+  const sectionParam='navSection';
+  let pendingSection=new URLSearchParams(location.search).get(sectionParam);
+  const sectionLabels={
+    '/admin/':['AI configuration','Create organization','Organization app access','Sentinel sources','Sentinel operations','Invite user','Bulk manage users','Users','Assign users to organization','User app access','Audit log'],
+    '/tenant-admin/':['Members','Application access','Add or update member','Sentinel sources'],
+    '/portfolio-management/':['Overview','Customers','Backlogs','Prioritization','Portfolio Explorer','Strategy Canvas','Roadmaps'],
+    '/action-inbox/':['My Actions','All Exceptions','Business Rules'],
+    '/crm/':['Overview','Customers','Associates','Engagements','Commitments','Activities','Feedback','Relationship Health','Configuration']
+  };
+  async function availableSections(href){
+    if(href==='/action-inbox/')return sectionLabels[href].filter((_,i)=>i===0||canCreateResources());
+    if(href==='/crm/'){
+      if(!activeTenantId)return [];
+      const {data,error}=await sb.from('crm_settings').select('engagements,commitments,feedback,health').eq('org_id',activeTenantId).maybeSingle();
+      if(error)return [];
+      const flags={Engagements:'engagements',Commitments:'commitments',Feedback:'feedback','Relationship Health':'health'};
+      return sectionLabels[href].filter(label=>label==='Configuration'?canCreateResources():!flags[label]||data?.[flags[label]]!==false);
+    }
+    return sectionLabels[href]||[];
+  }
+  function sectionUrl(href,label){const url=new URL(href,location.origin);url.searchParams.set(sectionParam,label);return url.pathname+url.search;}
+
   menu.replaceChildren();
   for(const [title,entries] of groups){
     const heading=el('div',{className:'ap-group-label',textContent:title,hidden:true});menu.append(heading);
@@ -111,6 +135,34 @@
         activeSub=el('div',{className:'ap-sub',hidden:true});activeExpand=el('button',{className:'ap-expand',type:'button',textContent:'⌄',hidden:true});activeExpand.setAttribute('aria-label','Toggle application sections');activeExpand.setAttribute('aria-expanded','true');
         activeExpand.addEventListener('click',()=>{activeSub.hidden=!activeSub.hidden;activeExpand.setAttribute('aria-expanded',String(!activeSub.hidden))});row.append(activeExpand);menu.append(activeSub);
       }
+      if(sectionLabels[href]){
+        const current=row===activeRow;
+        const sub=current?activeSub:el('div',{className:'ap-sub ap-mobile-sections',hidden:true});
+        if(!current)menu.append(sub);
+        const expand=current?activeExpand:el('button',{className:'ap-expand ap-mobile-sections',type:'button',textContent:'⌄',hidden:true});
+        if(!current)row.append(expand);
+        mobileParents.set(href,{row,sub,expand,current});
+        const open=async e=>{
+          if(!mobileMode()||row.hidden)return;
+          e.preventDefault();
+          if(!sub.hidden){sub.hidden=true;expand.setAttribute('aria-expanded','false');return;}
+          for(const other of mobileParents.values()){other.sub.hidden=true;other.expand.setAttribute('aria-expanded','false');}
+          sub.hidden=false;expand.setAttribute('aria-expanded','true');
+          if(current&&sub.childElementCount)return;
+          const tenant=activeTenantId;
+          sub.replaceChildren(el('span',{textContent:'Loading sections…'}));
+          let labels=[];
+          try{labels=await availableSections(href)}catch(e){}
+          if(row.hidden||tenant!==activeTenantId||sub.hidden)return;
+          sub.replaceChildren();
+          if(!labels.length){location.assign(href);return;}
+          labels.forEach(label=>sub.append(el('a',{href:sectionUrl(href,label),textContent:label})));
+        };
+        a.addEventListener('click',open);
+        if(!current)expand.addEventListener('click',open);
+        expand.setAttribute('aria-label','Toggle '+label+' sections');
+        expand.setAttribute('aria-expanded','false');
+      }
     }
   }
   const toggle=el('button',{className:'ap-nav-toggle',type:'button',textContent:'‹ Collapse'});sidebar.append(toggle);
@@ -119,17 +171,19 @@
   toggle.addEventListener('click',()=>collapse(!document.body.classList.contains('ap-collapsed')));
   mobile.addEventListener('click',()=>{collapse(false);const open=document.body.classList.toggle('ap-drawer');mobile.setAttribute('aria-expanded',String(open))});
   document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.body.classList.remove('ap-drawer');mobile.setAttribute('aria-expanded','false')}});
+  style.textContent+='\n@media(min-width:761px){#appNav .ap-mobile-sections{display:none!important}}\n';
   function syncSections(){
     if(!activeSub||activeRow?.hidden)return;
     const source=document.querySelector('.admin-nav,#crmNav,#tabs,.ainbox-tabs');
     if(!source)return;
     const controls=Array.from(source.querySelectorAll('button,a')).filter(b=>!b.hidden&&!b.disabled&&b.textContent.trim());
     if(!controls.length)return;
+    if(pendingSection){const target=controls.find(b=>b.textContent.trim()===pendingSection);if(target){pendingSection=null;const url=new URL(location.href);url.searchParams.delete(sectionParam);history.replaceState(history.state,'',url);target.click();return;}}
     const signature=JSON.stringify(controls.map(b=>[b.textContent.trim(),b.getAttribute('aria-current'),b.getAttribute('aria-selected'),b.className]));
     if(activeSub.dataset.signature===signature)return;
     activeSub.dataset.signature=signature;activeSub.replaceChildren();
     controls.forEach(b=>{const item=el('button',{type:'button',textContent:b.textContent.trim()});if(b.hasAttribute('aria-current')||b.getAttribute('aria-selected')==='true'||b.classList.contains('active'))item.setAttribute('aria-current','page');item.addEventListener('click',()=>{b.click();document.body.classList.remove('ap-drawer');mobile.setAttribute('aria-expanded','false');syncSections()});activeSub.append(item)});
-    if(activeExpand.hidden){activeExpand.hidden=false;activeSub.hidden=false}
+    if(activeExpand.hidden){activeExpand.hidden=false;activeSub.hidden=mobileMode();activeExpand.setAttribute('aria-expanded',String(!activeSub.hidden))}
     (source.closest('.admin-sidebar')||source).classList.add('ap-local-mirrored');
   }
   const observer=new MutationObserver(records=>{if(records.some(r=>!nav.contains(r.target)))syncSections()});
@@ -164,6 +218,7 @@
       heading.hidden=!entries.some(([href])=>{const a=links.get(href);return a&&!a.hidden&&!a.parentElement.hidden;});
     }
     if(activeSub&&activeRow?.hidden)activeSub.hidden=true;
+    for(const entry of mobileParents.values()){if(!entry.current){entry.sub.hidden=true;entry.sub.replaceChildren();entry.expand.hidden=entry.row.hidden;entry.expand.setAttribute('aria-expanded','false');}}
     syncSections();
     $('apWho').textContent = profile.full_name || profile.email || '';
     $('apAvatar').textContent=(profile.full_name || profile.email || 'U').split(/[\\s@]+/).filter(Boolean).slice(0,2).map(x=>x[0].toUpperCase()).join('');

@@ -35,13 +35,18 @@
   let organizationProfile=null;
   const applyOrganizationTheme=async()=>{
     organizationProfile=null;
+    delete document.documentElement.dataset.orgTheme;
     for(const [variable,value] of Object.entries({'--ap-blue':'#006BB6','--ap-midnight':'#0A192F','--ap-slate':'#708090'}))document.documentElement.style.setProperty(variable,value);
     if(activeTenantId){
-      const {data,error}=await sb.from('organization_profiles').select('primary_color,secondary_color,accent_color,logo_data').eq('tenant_id',activeTenantId).maybeSingle();
+      const {data,error}=await sb.from('organization_profiles').select('primary_color,secondary_color,accent_color,logo_data,theme_mode').eq('tenant_id',activeTenantId).maybeSingle();
       if(!error&&data){organizationProfile=data;
-        if(data.primary_color)document.documentElement.style.setProperty('--ap-blue',data.primary_color);
-        if(data.secondary_color)document.documentElement.style.setProperty('--ap-midnight',data.secondary_color);
-        if(data.accent_color)document.documentElement.style.setProperty('--ap-slate',data.accent_color);
+        if(data.theme_mode!=='default'&&data.primary_color)document.documentElement.style.setProperty('--ap-blue',data.primary_color);
+        if(data.theme_mode!=='default'&&data.secondary_color)document.documentElement.style.setProperty('--ap-midnight',data.secondary_color);
+        if(data.theme_mode!=='default'&&data.accent_color)document.documentElement.style.setProperty('--ap-slate',data.accent_color);
+        if(data.theme_mode==='wild'&&activeTenantId==='a037530e-a0e6-4e75-af35-443203187b09'){
+          document.documentElement.dataset.orgTheme='wild';
+          for(const [k,v] of Object.entries({'--ap-blue':'#C40016','--ap-midnight':'#15151B','--ap-slate':'#79502E'}))document.documentElement.style.setProperty(k,v);
+        }
       }
     }
     window.dispatchEvent(new CustomEvent('organization-theme-changed',{detail:organizationProfile}));

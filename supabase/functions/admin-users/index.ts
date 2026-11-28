@@ -6,17 +6,18 @@ const URL_ = Deno.env.get('SUPABASE_URL')!;
 const SERVICE = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const ORIGIN = Deno.env.get('APP_ORIGIN') ?? 'https://app.90s6.com';
 
-const cors = {
-  'Access-Control-Allow-Origin': ORIGIN,
+const allowedOrigins = new Set([ORIGIN, 'https://app.90s6.com', 'https://app2.90s6.com']);
+const corsBase = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Vary': 'Origin',
 };
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('Origin');
+  const cors = { ...corsBase, 'Access-Control-Allow-Origin': origin && allowedOrigins.has(origin) ? origin : ORIGIN };
+  const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { ...cors, 'Content-Type': 'application/json' } });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors });
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
 

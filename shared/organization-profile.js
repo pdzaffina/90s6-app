@@ -10,6 +10,7 @@
  panel.className=isGlobal?'ap-panel':'ap-org-profile';
  panel.innerHTML='<h2>Organization profile</h2><p class="ap-msg">Customize the active organization. Leave colors at their defaults to use the 90s6 palette.</p>'+
  (isGlobal?'<label>Organization <select id="orgBrandTenant" class="ap-input"><option value="">Choose organization</option></select></label>':'')+
+ '<label class="ap-theme-picker">Organization theme<select id="orgThemeMode" class="ap-input"><option value="default">90s6 Default</option><option value="logo">Logo-generated / custom palette</option><option value="wild" hidden disabled>Wild Theme</option></select></label>'+ 
  '<div class="ap-org-brand-fields"><label>Primary color <input type="color" id="orgBrandPrimary"></label><label>Secondary color <input type="color" id="orgBrandSecondary"></label><label>Accent color <input type="color" id="orgBrandAccent"></label></div>'+
  '<div class="ap-org-brand-fields"><label>Organization logo (any browser-supported image, 2 MB max)<input id="orgBrandFile" class="ap-input" type="file" accept=".svg,.png,image/svg+xml,image/png"></label><div><img id="orgBrandPreview" alt="Organization logo preview" hidden><button id="orgBrandRemove" type="button" class="ap-btn sm">Remove logo</button></div></div>'+
  '<div class="ap-row"><button id="orgBrandSuggest" type="button" class="ap-btn" style="background:#e8f3fc;color:#006bb6;border-color:#b7d9ef">✦ Suggest palette with AI</button></div><p id="orgBrandAiStatus" class="ap-msg" role="status"></p><div id="orgBrandAiResult" class="ap-org-ai-result" hidden></div>'+ 
@@ -22,11 +23,13 @@
  async function load(id){
   tenant=id;loaded=false;logo=null;preview();status('');$('orgBrandAiResult').hidden=true;aiStatus('');
   Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);
+  const mode=$('orgThemeMode');const wild=mode.querySelector('[value=wild]');wild.hidden=wild.disabled=id!=='a037530e-a0e6-4e75-af35-443203187b09';mode.value='logo';
   if(!id)return;
   const {data,error}=await sb.from('organization_profiles').select('*').eq('tenant_id',id).maybeSingle();
   if(error){status('Could not load profile: '+error.message);return;}
   if(tenant!==id)return;
   Object.entries(fields).forEach(([k,e])=>e.value=data?.[k]||defaults[k]);
+  mode.value=data?.theme_mode||'logo';
   logo=data?.logo_data||null;preview();loaded=true;
  }
  if(isGlobal){
@@ -36,7 +39,7 @@
   App.onSession((session,profile)=>{if(!session)return;const id=new URLSearchParams(location.search).get('tenant')||App.activeTenantId;if(id)load(id)});
  }
  $('orgBrandRemove').onclick=()=>{logo=null;$('orgBrandAiResult').hidden=true;preview();status('Logo removed from preview. Save to apply.')};
- $('orgBrandReset').onclick=()=>{Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);status('Default colors selected. Save to apply.')};
+ $('orgBrandReset').onclick=()=>{$('orgThemeMode').value='default';Object.entries(fields).forEach(([k,e])=>e.value=defaults[k]);status('Default colors selected. Save to apply.')};
  $('orgBrandFile').onchange=async e=>{
   const file=e.target.files?.[0];if(!file)return;
   try{
@@ -95,7 +98,7 @@
    const caption=document.createElement('span');caption.textContent=label+' '+colors[key];wrap.append(swatch,caption);swatches.append(wrap);
   }
   const apply=document.createElement('button');apply.type='button';apply.className='ap-btn primary sm';apply.textContent='Apply suggested colors';
-  apply.onclick=()=>{for(const [key,field] of Object.entries(fields))field.value=colors[key];aiStatus('Suggested colors applied. Save organization profile to publish.');};
+  apply.onclick=()=>{$('orgThemeMode').value='logo';for(const [key,field] of Object.entries(fields))field.value=colors[key];aiStatus('Suggested colors applied. Save organization profile to publish.');};
   result.append(heading,swatches,note,apply);result.hidden=false;
  }
  $('orgBrandSuggest').onclick=async()=>{
@@ -137,7 +140,7 @@
   if(!tenant||!loaded){status('Select an organization and wait for its profile to load.');return;}
   const btn=$('orgBrandSave');btn.disabled=true;status('Saving...');
   try{
-   const payload={tenant_id:tenant,logo_data:logo};
+   const payload={tenant_id:tenant,logo_data:logo,theme_mode:$('orgThemeMode').value};
    for(const [k,e] of Object.entries(fields))payload[k]=e.value.toLowerCase()===defaults[k].toLowerCase()?null:e.value;
    const {error}=await sb.from('organization_profiles').upsert(payload,{onConflict:'tenant_id'});
    if(error)throw error;

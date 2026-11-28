@@ -115,9 +115,7 @@
         : !u.last_seen_at ? el('span', { className: 'ap-tag dim', textContent: 'Invited' })
         : el('span', { className: 'ap-tag', textContent: 'Active' });
       const actions = el('div', { className: 'ap-row' });
-      const intro = el('button',{type:'button',className:'ap-btn sm',textContent:'Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off')});
-      intro.onclick=async()=>{intro.disabled=true;const {error}=await App.sb.rpc('set_intro_presentation',{p_user:u.id,p_enabled:!u.intro_presentation_enabled});if(error){say(error.message);intro.disabled=false;return;}u.intro_presentation_enabled=!u.intro_presentation_enabled;intro.textContent='Welcome presentation: '+(u.intro_presentation_enabled?'On':'Off');intro.disabled=false;};
-      actions.append(intro); const tours=el('button',{type:'button',className:'ap-btn sm',textContent:'Application tours'});tours.onclick=()=>window.openUserTours(u);actions.append(tours);
+      const access=el('button',{type:'button',className:'ap-btn primary sm',textContent:'Manage access'});access.onclick=()=>window.openUserAccess(u,null,allOrganizations.filter(o=>(organizationsByUser.get(u.id)||[]).some(m=>m.tenant_id===o.id&&m.status==='active')),load);actions.append(access);
       if (isMe) actions.append(el('span', { className: 'ap-msg', textContent: 'You' }));
       else {
         const btn = (text, cls, fn) => { const b = el('button', { type: 'button', className: 'ap-btn sm ' + cls, textContent: text }); b.addEventListener('click', fn); return b; };

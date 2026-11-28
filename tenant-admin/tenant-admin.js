@@ -19,7 +19,7 @@ async function refresh(){
  memberIds=(members||[]).map(m=>m.user_id);
  let profiles=[];
  if(memberIds.length){
-  const {data,error}=await sb.from('profiles').select('id,email,full_name,is_admin,disabled').in('id',memberIds).order('email');
+  const {data,error}=await sb.from('profiles').select('id,email,full_name,is_admin,disabled,intro_presentation_enabled').in('id',memberIds).order('email');
   if(error)throw error;profiles=data||[];
  }
  const users=profiles.filter(p=>current.is_admin||!p.is_admin);
@@ -48,7 +48,7 @@ async function refresh(){
     roleSelect.disabled=p.is_admin||p.disabled;
   };
   roleCell.append(roleSelect);tr.append(roleCell);
-  const stateCell=document.createElement('td');stateCell.textContent=m.status;tr.append(stateCell);
+  const stateCell=document.createElement('td');stateCell.textContent=m.status+' ';const intro=document.createElement('button');intro.type='button';intro.className='ap-btn sm';intro.textContent='Welcome presentation: '+(p.intro_presentation_enabled?'On':'Off');intro.disabled=p.is_admin||p.disabled||m.status!=='active';intro.onclick=async()=>{intro.disabled=true;const {error}=await sb.rpc('set_intro_presentation',{p_user:p.id,p_enabled:!p.intro_presentation_enabled,p_tenant:tenant});if(error)status(error.message);else{p.intro_presentation_enabled=!p.intro_presentation_enabled;intro.textContent='Welcome presentation: '+(p.intro_presentation_enabled?'On':'Off');status('Welcome presentation updated for '+p.email);}intro.disabled=false;};stateCell.append(intro);tr.append(stateCell);
   $('tenantAdminRows').append(tr);
  }
  $('tenantMemberUser').replaceChildren(option('','Select an organization member'));

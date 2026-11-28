@@ -238,7 +238,7 @@
     session = s;
     $('apForm').hidden = true; gate.classList.add('ap-pending'); gate.hidden = false; msg('');
     const { data, error } = await sb.from('profiles')
-      .select('id,email,full_name,is_admin,is_superuser,is_content_creator,disabled,tour_completed_at,intro_presentation_completed_at').eq('id', s.user.id).maybeSingle();
+      .select('id,email,full_name,is_admin,is_superuser,is_content_creator,disabled,tour_completed_at,intro_presentation_completed_at,intro_presentation_enabled').eq('id', s.user.id).maybeSingle();
     if (error || !data || data.disabled) {
       notice = data && data.disabled ? 'This account is disabled. Contact your administrator.' : 'Could not load your account. Try again.';
       session = null;

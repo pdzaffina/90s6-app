@@ -29,7 +29,7 @@ $('resetPresentation').addEventListener('click', async () => {
  if (!userId) return;
  const {error}=await App.sb.from('profiles').update({intro_presentation_completed_at:null}).eq('id',userId);
  if(!error){sessionStorage.removeItem('90s6-intro-launch:'+userId);localStorage.removeItem('90s6-intro-dismissed:'+userId);localStorage.removeItem('90s6-intro-launched:'+userId);}
- $('presentationMsg').textContent=error?error.message:'Presentation reset. It will appear when you next sign in.';
+ $('presentationMsg').textContent=error?error.message:'Presentation reset. It will appear on your next sign-in if enabled by an administrator.';
  $('presentationMsg').className='ap-msg'+(error?' err':'');
 });
 $('replayTour').addEventListener('click', () => { if(window.AppTour) window.AppTour.restart(); });
